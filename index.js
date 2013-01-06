@@ -1,8 +1,8 @@
 
 
 
-var Worker = require("bindings")("_cocaine.node").Worker;
-var events = require("events");
+var Run = require("./build/Release/cocaine.node").run;
+//var events = require("events");
 
-Worker.prototype.__proto__=events.EventEmitter.prototype
-exports.Worker = Worker;
+//Worker.prototype.__proto__=events.EventEmitter.prototype
+exports.Run = Run;

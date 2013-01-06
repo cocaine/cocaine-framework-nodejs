@@ -1,21 +1,11 @@
 {
   'targets': [
     {
-      'target_name': '_cocaine',
-      'sources': [ 'src/_cocaine.cc' ],
-      'libraries': ['-lzmq'],
-      'cflags!': ['-fno-exceptions'],
-      'cflags_cc!': ['-fno-exceptions'],
-      'conditions': [
-        ['OS=="linux"', {
-          'cflags': [
-            '<!(pkg-config libzmq --cflags 2>/dev/null || echo "")',
-          ],
-          'libraries': [
-            '<!(pkg-config libzmq --libs 2>/dev/null || echo "")',
-          ]
-        }]
-      ]
+      'target_name': 'cocaine',
+      'sources': [ 'src/main.cpp','src/worker.cpp'],
+      'libraries': ['-lcocaine-core -lboost_program_options-mt'],
+      'cflags': ['-std=c++0x','-g'],
+      'cflags_cc!':['-fno-rtti','-fno-exceptions']
     }
   ]
 }

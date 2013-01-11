@@ -65,13 +65,18 @@ namespace cocaine { namespace engine {
       io::unique_channel_t m_channel;
         
       // Event loop
-      uv::default_loop m_loop;
+      //uv::default_loop m_loop;
+
+      //uv::io m_watcher;
+      uv_poll_t* m_watcher_uv;
+      
+      //uv::prepare m_checker;
+      uv_prepare_t* m_checker_uv;
         
-      uv::io m_watcher;
-      uv::prepare m_checker;
-        
-      uv::timer m_heartbeat_timer,
-        m_disown_timer;
+      //uv::timer m_heartbeat_timer,
+      //  m_disown_timer;
+      uv_timer_t* m_hearbeat_timer_uv,
+        m_disown_timer_uv;
 
       // The app
 

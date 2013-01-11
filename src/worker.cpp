@@ -120,16 +120,25 @@ worker_t::worker_t(context_t& context,
     
   m_channel.connect(endpoint);
 
-  //m_uv_poll_handle_ = new uv_poll_t;
-  //m_uv_poll_handle_->data = this;
-  
-  m_watcher.set<worker_t, &worker_t::on_event>(this);
-  m_watcher.start(m_channel.fd(), uv::READ);
-  m_checker.set<worker_t, &worker_t::on_check>(this);
-  m_checker.start();
+  //m_watcher.set<worker_t, &worker_t::on_event>(this);
+  //m_watcher.start(m_channel.fd(), uv::READ);
+  m_watcher_uv = new uv_poll_t;
+  m_watcher_uv->data=this;
+  uv_os_sock_t socket=m_channel.fd();
+  uv_poll_init_socket(uv_default_loop(), m_watcher_uv, socket);
+  uv_poll_start(m_watcher_uv, UV_READABLE, worker_t::uv_on_event);
 
-  m_heartbeat_timer.set<worker_t, &worker_t::on_heartbeat>(this);
-  m_heartbeat_timer.start(0.0f, 5.0f);
+  //m_checker.set<worker_t, &worker_t::on_check>(this);
+  //m_checker.start();
+  m_checker_uv = new uv_prepate_t;
+  m_checker_uv->data=this;
+  uv_prepare_start(m_checker_uv,worker_t::uv_on_check);
+
+  //m_heartbeat_timer.set<worker_t, &worker_t::on_heartbeat>(this);
+  //m_heartbeat_timer.start(0.0f, 5.0f);
+  m_heartbeat_timer_uv = new uv_timer_t;
+  m_heartbeat_timer_uv->data=this;
+  uv_timer_start(m_heartbeat_timer_uv,worker_t::uv_on_heartbeat);
 
   // Launching the app
 
@@ -153,8 +162,11 @@ worker_t::worker_t(context_t& context,
     throw;
   }
     
-  m_disown_timer.set<worker_t, &worker_t::on_disown>(this);
-  m_disown_timer.start(m_profile->heartbeat_timeout);
+  //m_disown_timer.set<worker_t, &worker_t::on_disown>(this);
+  //m_disown_timer.start(m_profile->heartbeat_timeout);
+  m_disown_timer_uv = new uv_timer_t;
+  m_disown_timer_uv->data=this;
+  uv_timer_start(m_disown_timer_uv,worker_t::uv_on_disown)
 }
 
 worker_t::~worker_t() {
@@ -168,10 +180,12 @@ worker_t::run() {
 
 void
 worker_t::on_event(uv::io&, int) {
-  m_checker.stop();
+  //m_checker.stop();
+  uv_prepare_stop(m_checker_uv)
 
   if(m_channel.pending()) {
-    m_checker.start();
+    //m_checker.start();
+    uv_prepare_start(m_checker_uv,worker_t::uv_on_check);
     process();
   }
 }
@@ -179,6 +193,7 @@ worker_t::on_event(uv::io&, int) {
 void
 worker_t::on_check(uv::prepare&, int) {
   m_loop.feed_fd_event(m_channel.fd(), ev::READ);
+  //XXX
 }
 
 void
@@ -199,6 +214,7 @@ worker_t::on_disown(uv::timer&, int) {
     );
 
   m_loop.unloop(uv::ALL);
+  //XXX
 }
 
 void
@@ -229,8 +245,12 @@ worker_t::process() {
 
       switch(message_id) {
         case event_traits<rpc::heartbeat>::id:
-          m_disown_timer.stop();
-          m_disown_timer.start(m_profile->heartbeat_timeout);
+          //m_disown_timer.stop();
+          uv_timer_stop(m_disown_timer_uv);
+          //m_disown_timer.start(m_profile->heartbeat_timeout);
+          uv_timer_start(m_disown_timer_uv,
+                         m_profile->heartbeat_timeout,
+                         worker_t::uv_on_heartbeat);
                 
           break;
 
@@ -327,6 +347,7 @@ worker_t::process() {
 
   // Feed the event loop.
   m_loop.feed_fd_event(m_channel.fd(), uv::READ);
+  //XXX
 
 }
 
@@ -336,4 +357,5 @@ worker_t::terminate(rpc::suicide::reasons reason,
 {
   send<rpc::suicide>(static_cast<int>(reason), message);
   m_loop.unloop(uv::ALL);
+  //XXX
 }

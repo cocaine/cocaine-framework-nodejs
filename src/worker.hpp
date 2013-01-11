@@ -35,17 +35,25 @@ namespace cocaine { namespace engine {
       send(Args&&... args);
 
     private:
-      void
-      on_event(uv::io&, int);
+      //void
+      //on_event(uv::io&, int);
+      static void
+      uv_on_event(uv_poll_t* handle, int status, int events);
         
-      void
-      on_check(uv::prepare&, int);
+      //void
+      //on_check(uv::prepare&, int);
+      static void
+      ov_on_check();
         
-      void
-      on_heartbeat(uv::timer&, int);
+      //void
+      //on_heartbeat(uv::timer&, int);
+      static void
+      uv_on_heartbeat();
 
-      void
-      on_disown(uv::timer&, int);
+      //void
+      //on_disown(uv::timer&, int);
+      static void
+      uv_on_disown();
 
       void
       process();

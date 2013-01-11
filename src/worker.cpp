@@ -124,7 +124,7 @@ worker_t::worker_t(context_t& context,
   //m_uv_poll_handle_->data = this;
   
   m_watcher.set<worker_t, &worker_t::on_event>(this);
-  m_watcher.start(m_channel.fd(), ev::READ);
+  m_watcher.start(m_channel.fd(), uv::READ);
   m_checker.set<worker_t, &worker_t::on_check>(this);
   m_checker.start();
 
@@ -139,13 +139,12 @@ worker_t::worker_t(context_t& context,
         
     fs::path path = fs::path(m_context.config.path.spool) / config.app;
          
-    m_sandbox = m_context.get<api::sandbox_t>(
-      m_manifest->sandbox.type,
-      m_context,
+    m_sandbox = new JsSandbox(
+      m_contect,
       m_manifest->name,
       m_manifest->sandbox.args,
-      path.string()
-      );
+      path.string())
+    
   } catch(const std::exception& e) {
     terminate(rpc::suicide::abnormal, e.what());
     throw;
@@ -164,11 +163,11 @@ worker_t::~worker_t() {
 
 void
 worker_t::run() {
-  m_loop.loop();
+  // Empty.
 }
 
 void
-worker_t::on_event(ev::io&, int) {
+worker_t::on_event(uv::io&, int) {
   m_checker.stop();
 
   if(m_channel.pending()) {
@@ -178,12 +177,12 @@ worker_t::on_event(ev::io&, int) {
 }
 
 void
-worker_t::on_check(ev::prepare&, int) {
+worker_t::on_check(uv::prepare&, int) {
   m_loop.feed_fd_event(m_channel.fd(), ev::READ);
 }
 
 void
-worker_t::on_heartbeat(ev::timer&, int) {
+worker_t::on_heartbeat(uv::timer&, int) {
   scoped_option<
     options::send_timeout
     > option(m_channel, 0);
@@ -192,14 +191,14 @@ worker_t::on_heartbeat(ev::timer&, int) {
 }
 
 void
-worker_t::on_disown(ev::timer&, int) {
+worker_t::on_disown(uv::timer&, int) {
   COCAINE_LOG_ERROR(
     m_log,
     "worker %s has lost the controlling engine",
     m_id
     );
 
-  m_loop.unloop(ev::ALL);    
+  m_loop.unloop(uv::ALL);
 }
 
 void
@@ -327,7 +326,7 @@ worker_t::process() {
   } while(--counter);
 
   // Feed the event loop.
-  m_loop.feed_fd_event(m_channel.fd(), ev::READ);
+  m_loop.feed_fd_event(m_channel.fd(), uv::READ);
 
 }
 
@@ -336,5 +335,5 @@ worker_t::terminate(rpc::suicide::reasons reason,
                     const std::string& message)
 {
   send<rpc::suicide>(static_cast<int>(reason), message);
-  m_loop.unloop(ev::ALL);
+  m_loop.unloop(uv::ALL);
 }

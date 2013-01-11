@@ -1,11 +1,10 @@
-
 #ifndef COCAINE_GENERIC_WORKER_HPP
 #define COCAINE_GENERIC_WORKER_HPP
 
 #include <cocaine/common.hpp>
 #include <cocaine/rpc.hpp>
 #include <cocaine/unique_id.hpp>
-#include <cocaine/asio.hpp>
+#include "uv++.h"
 
 #include <cocaine/api/stream.hpp>
 
@@ -37,16 +36,16 @@ namespace cocaine { namespace engine {
 
     private:
       void
-      on_event(ev::io&, int);
+      on_event(uv::io&, int);
         
       void
-      on_check(ev::prepare&, int);
+      on_check(uv::prepare&, int);
         
       void
-      on_heartbeat(ev::timer&, int);
+      on_heartbeat(uv::timer&, int);
 
       void
-      on_disown(ev::timer&, int);
+      on_disown(uv::timer&, int);
 
       void
       process();
@@ -60,25 +59,20 @@ namespace cocaine { namespace engine {
       std::unique_ptr<logging::log_t> m_log;
 
       // Configuration
-
       const unique_id_t m_id;
 
       // Engine I/O
-
       io::unique_channel_t m_channel;
         
       // Event loop
-
-      ev::default_loop m_loop;
+      uv::default_loop m_loop;
         
-      ev::io m_watcher;
-      ev::prepare m_checker;
+      uv::io m_watcher;
+      uv::prepare m_checker;
         
-      ev::timer m_heartbeat_timer,
+      uv::timer m_heartbeat_timer,
         m_disown_timer;
 
-      uv_poll_t* m_uv_poll_handle_;
-        
       // The app
 
       std::unique_ptr<const manifest_t> m_manifest;
@@ -108,7 +102,6 @@ namespace cocaine { namespace engine {
     worker_t::send(Args&&... args) {
       m_channel.send<Event>(std::forward<Args>(args)...);
     }
-
   }} // namespace cocaine::engine
 
 #endif

@@ -74,6 +74,7 @@ namespace cocaine { namespace engine {
         
       // Event loop
       //uv::default_loop m_loop;
+      uv_loop_t *m_loop;
 
       //uv::io m_watcher;
       uv_poll_t* m_watcher_uv;

@@ -4,7 +4,7 @@
 #include <cocaine/common.hpp>
 #include <cocaine/rpc.hpp>
 #include <cocaine/unique_id.hpp>
-#include "uv++.h"
+//#include "uv++.h"
 
 #include <cocaine/api/stream.hpp>
 
@@ -107,8 +107,18 @@ namespace cocaine { namespace engine {
           io_pair_t
           > stream_map_t;
 
+#if BOOST_VERSION >= 103600
+      typedef boost::unordered_map<
+#else
+        typedef std::map<
+#endif
+          unique_id_t,
+          boost::shared_ptr<api::stream_t>
+          > upstream_map_t;
+
       // Session streams.
-      stream_map_t m_streams;
+      //stream_map_t m_streams;
+      upstream_map_t m_upstreams;
     };
 
     template<class Event, typename... Args>

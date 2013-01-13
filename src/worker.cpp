@@ -152,11 +152,11 @@ worker_t::worker_t(context_t& context,
         
     fs::path path = fs::path(m_context.config.path.spool) / config.app;
          
-    m_sandbox = new JsSandbox(
-      m_contect,
-      m_manifest->name,
-      m_manifest->sandbox.args,
-      path.string())
+    // m_sandbox = new JsSandbox(
+    //   m_contect,
+    //   m_manifest->name,
+    //   m_manifest->sandbox.args,
+    //   path.string())
     
   } catch(const std::exception& e) {
     terminate(rpc::suicide::abnormal, e.what());
@@ -279,12 +279,13 @@ worker_t::process() {
             );
 
           try {
-            io_pair_t io = {
-              upstream,
-              m_sandbox->invoke(event, upstream)
-            };
+            // io_pair_t io = {
+            //   upstream,
+            //   m_sandbox->invoke(event, upstream)
+            // };
 
-            m_streams.emplace(session_id, io);
+            //m_streams.emplace(session_id, io);
+            m_upstreams.emplace(session_id, upstream);
           } catch(const std::exception& e) {
             upstream->error(invocation_error, e.what());
           } catch(...) {
@@ -300,18 +301,23 @@ worker_t::process() {
 
           m_channel.recv<rpc::chunk>(session_id, message);
 
-          stream_map_t::iterator it(m_streams.find(session_id));
+          //stream_map_t::iterator it(m_streams.find(session_id));
+          upstream_map_t::iterator it(m_upstreams.find(session_id));
 
           // NOTE: This may be a chunk for a failed invocation, in which case there
           // will be no active stream, so drop the message.
-          if(it != m_streams.end()) {
+          if(it != m_upstreams.end()) {
             try {
-              it->second.downstream->push(message.data(), message.size());
+              //it->second.downstream->push(message.data(), message.size());
+              it->second->error(invocation_error, "unexpected exception");
+              m_streams.erase(it);
             } catch(const std::exception& e) {
-              it->second.upstream->error(invocation_error, e.what());
+              //it->second.upstream->error(invocation_error, e.what());
+              it->second->error(invocation_error, e.what());
               m_streams.erase(it);
             } catch(...) {
-              it->second.upstream->error(invocation_error, "unexpected exception");
+              //it->second.upstream->error(invocation_error, "unexpected exception");
+              it->second->error(invocation_error, "unexpected exception");
               m_streams.erase(it);
             }
           }
@@ -324,17 +330,21 @@ worker_t::process() {
 
           m_channel.recv<rpc::choke>(session_id);
 
-          stream_map_t::iterator it = m_streams.find(session_id);
+          //stream_map_t::iterator it = m_streams.find(session_id);
+          upstream_map_t::iterator it = m_upstreams.find(session_id);
 
           // NOTE: This may be a choke for a failed invocation, in which case there
           // will be no active stream, so drop the message.
-          if(it != m_streams.end()) {
+          if(it != m_upstreams.end()) {
             try {
-              it->second.downstream->close();
+              //it->second.downstream->close();
+              //it->second.downstream->close();
             } catch(const std::exception& e) {
-              it->second.upstream->error(invocation_error, e.what());
+              //it->second.upstream->error(invocation_error, e.what());
+              it->second->error(invocation_error, e.what());
             } catch(...) {
-              it->second.upstream->error(invocation_error, "unexpected exception");
+              //it->second.upstream->error(invocation_error, "unexpected exception");
+              it->second->error(invocation_error, "unexpected exception");
             }
                     
             m_streams.erase(it);

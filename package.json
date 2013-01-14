@@ -16,6 +16,5 @@
     "msgpack": ">=0.1.7"
   },
   "devDependencies": {
-    "zmq": "2.2.0"
   }
 }

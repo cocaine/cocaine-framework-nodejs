@@ -9,6 +9,8 @@
 #include <cocaine/api/sandbox.hpp>
 
 #include <cocaine/traits/unique_id.hpp>
+#include <cocaine/traits.hpp>
+#include <cocaine/traits/json.hpp>
 
 #include <boost/filesystem/path.hpp>
 
@@ -266,7 +268,7 @@ worker_t::process() {
         }
       }
 
-      COCAINE_LOG_DEBUG(
+      COCAINE_LOG_ERROR(
         m_log,
         "worker %s received type %d message",
         m_id,
@@ -286,6 +288,11 @@ worker_t::process() {
 
           m_channel.recv<rpc::invoke>(session_id, event);
 
+          COCAINE_LOG_ERROR(
+            m_log,
+            "worker %s session %s: received event %s",
+            m_id,session_id.string(),event);
+
           boost::shared_ptr<api::stream_t> upstream(
             boost::make_shared<upstream_t>(session_id, this)
             );
@@ -298,6 +305,28 @@ worker_t::process() {
 
             //m_streams.emplace(session_id, io);
             m_upstreams.emplace(session_id, upstream);
+
+            Json::Value v;
+            v["code"] = 200;
+            Json::Value hdr;
+            hdr.append("Content-Type");
+            hdr.append("text/plain");
+            v["headers"].append(hdr);
+            std::ostringstream s;
+            msgpack::packer<std::ostringstream> packer(s);
+            io::type_traits<Json::Value>::pack(packer, v);
+            std::string response = s.str();
+
+            COCAINE_LOG_ERROR(
+              m_log,
+              "worker %s session %s: responding",
+              m_id,session_id.string());
+
+            upstream->push(response.data(),response.length());
+            upstream->push("Evening everybody",17);
+            //it->second.downstream->close();
+            //upstream->close();
+
           } catch(const std::exception& e) {
             upstream->error(invocation_error, e.what());
           } catch(...) {
@@ -312,30 +341,33 @@ worker_t::process() {
           std::string message;
 
           m_channel.recv<rpc::chunk>(session_id, message);
+          COCAINE_LOG_ERROR(
+            m_log,
+            "worker %s session %s: received chunk length %d",
+            m_id,session_id.string(),message.size());
+            
+          // //stream_map_t::iterator it(m_streams.find(session_id));
+          // upstream_map_t::iterator it(m_upstreams.find(session_id));
 
-          //stream_map_t::iterator it(m_streams.find(session_id));
-          upstream_map_t::iterator it(m_upstreams.find(session_id));
-
-          // NOTE: This may be a chunk for a failed invocation, in which case there
-          // will be no active stream, so drop the message.
-          if(it != m_upstreams.end()) {
-            try {
-              //it->second.downstream->push(message.data(), message.size());
-              it->second->error(invocation_error, "unexpected exception");
-              //m_streams.erase(it);
-              m_upstreams.erase(it);
-            } catch(const std::exception& e) {
-              //it->second.upstream->error(invocation_error, e.what());
-              it->second->error(invocation_error, e.what());
-              //m_streams.erase(it);
-              m_upstreams.erase(it);
-            } catch(...) {
-              //it->second.upstream->error(invocation_error, "unexpected exception");
-              it->second->error(invocation_error, "unexpected exception");
-              //m_streams.erase(it);
-              m_upstreams.erase(it);
-            }
-          }
+          // // NOTE: This may be a chunk for a failed invocation, in which case there
+          // // will be no active stream, so drop the message.
+          // if(it != m_upstreams.end()) {
+          //   try {
+          //     //it->second.downstream->push(message.data(), message.size());
+          //     //m_streams.erase(it);
+          //     //m_upstreams.erase(it);
+          //   } catch(const std::exception& e) {
+          //     //it->second.upstream->error(invocation_error, e.what());
+          //     it->second->error(invocation_error, e.what());
+          //     //m_streams.erase(it);
+          //     m_upstreams.erase(it);
+          //   } catch(...) {
+          //     //it->second.upstream->error(invocation_error, "unexpected exception");
+          //     it->second->error(invocation_error, "unexpected exception");
+          //     //m_streams.erase(it);
+          //     m_upstreams.erase(it);
+          //   }
+          // }
 
           break;
         }
@@ -345,6 +377,11 @@ worker_t::process() {
 
           m_channel.recv<rpc::choke>(session_id);
 
+          COCAINE_LOG_ERROR(
+            m_log,
+            "worker %s session %s: received close",
+            m_id,session_id.string());
+
           //stream_map_t::iterator it = m_streams.find(session_id);
           upstream_map_t::iterator it = m_upstreams.find(session_id);
 
@@ -352,8 +389,33 @@ worker_t::process() {
           // will be no active stream, so drop the message.
           if(it != m_upstreams.end()) {
             try {
-              //it->second.downstream->close();
-              //it->second.downstream->close();
+              // std::map<
+              //   std::string,
+              //   std::string> res;
+
+              // std::map<
+              //   std::string,
+              //   std::string> hh;
+          
+              // hh[(std::string)"X-By"]=(std::string)"coca-worker";
+
+              // res[(std::string)"code"]=(std::string)"200";
+              // //res[(std::string)"headers"]=hh;
+
+              // msgpack::sbuffer buffer;
+              // msgpack::packer<msgpack::sbuffer> packer(buffer);
+
+              // packer << res;
+              // COCAINE_LOG_ERROR(
+              //   m_log,
+              //   "worker %s session %s: responding",
+              //   m_id,session_id.string());
+
+              // it->second->push(buffer.data(),buffer.size());
+              // it->second->push("Evening everybody",17);
+              // //it->second.downstream->close();
+              it->second->close();
+              //
             } catch(const std::exception& e) {
               //it->second.upstream->error(invocation_error, e.what());
               it->second->error(invocation_error, e.what());

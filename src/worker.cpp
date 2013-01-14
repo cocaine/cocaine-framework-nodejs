@@ -108,19 +108,29 @@ namespace {
 
 worker_t::worker_t(context_t& context,
                    worker_config_t config):
-  m_loop(uv_default_loop()),
   m_context(context),
   m_log(new log_t(context, cocaine::format("app/%s", config.app))),
   m_id(config.uuid),
-  m_channel(context, ZMQ_DEALER, m_id)
+  m_channel(context, ZMQ_DEALER, m_id),
+  m_loop(uv_default_loop())
 {
   std::string endpoint = cocaine::format(
     "ipc://%1%/engines/%2%",
     m_context.config.path.runtime,
     config.app);
+
+  printf("i'm %p\n",(void*)this);
+  std::cout << "connecting to:" << endpoint << std::endl;
     
   m_channel.connect(endpoint);
 
+  COCAINE_LOG_ERROR(
+    m_log,
+    "%s: evening everybody",
+    m_id
+    );
+  
+  printf("pending %d\n",m_channel.pending());
   //m_watcher.set<worker_t, &worker_t::on_event>(this);
   //m_watcher.start(m_channel.fd(), uv::READ);
   m_watcher_uv = new uv_poll_t;
@@ -130,7 +140,7 @@ worker_t::worker_t(context_t& context,
 
   //m_checker.set<worker_t, &worker_t::on_check>(this);
   //m_checker.start();
-  m_checker_uv = new uv_prepate_t;
+  m_checker_uv = new uv_prepare_t;
   uv_prepare_init(m_loop,m_checker_uv);
   m_checker_uv->data=this;
   uv_prepare_start(m_checker_uv,worker_t::uv_on_check);
@@ -185,22 +195,27 @@ worker_t::run() {
   // Empty.
 }
 
-static void
+void
 worker_t::uv_on_event(uv_poll_t* hdl, int status, int events) {
-  BOOST_ASSERT(status==0);
+  //BOOST_ASSERT(status==0);
+  printf("worker %p got event\n",hdl->data);
   worker_t *w = static_cast<worker_t*>(hdl->data);
-  //m_checker.stop();
-  uv_prepare_stop(w->m_checker_uv);
+  w->on_event();
+}
 
-  if(w->m_channel.pending()) {
+void
+worker_t::on_event(){
+  uv_prepare_stop(m_checker_uv);
+
+  if(m_channel.pending()) {
     //m_checker.start();
-    uv_prepare_start(w->m_checker_uv,worker_t::uv_on_check);
-    w->process();
+    uv_prepare_start(m_checker_uv,worker_t::uv_on_check);
+    process();
   }
 }
 
-static void
-worker_t::uv_on_check(uv_prepare_t *hdl) {
+void
+worker_t::uv_on_check(uv_prepare_t *hdl,int) {
   //m_loop.feed_fd_event(m_channel.fd(), ev::READ);
   //worker_t *w = static_cast<worker_t*>(hdl->data);
   //uv_feed_fd_event(uv_default_loop(),
@@ -209,8 +224,9 @@ worker_t::uv_on_check(uv_prepare_t *hdl) {
 }
 
 void
-worker_t::uv_on_heartbeat(uv_timer_t *hdl) {
+worker_t::uv_on_heartbeat(uv_timer_t *hdl,int) {
   worker_t *w = static_cast<worker_t*>(hdl->data);
+  printf("beat\n");
   scoped_option<
     options::send_timeout
     > option(w->m_channel, 0);
@@ -218,12 +234,12 @@ worker_t::uv_on_heartbeat(uv_timer_t *hdl) {
 }
 
 void
-worker_t::uv_on_disown(uv_timer_t *hdl) {
+worker_t::uv_on_disown(uv_timer_t *hdl,int) {
   worker_t *w = static_cast<worker_t*>(hdl->data);
   COCAINE_LOG_ERROR(
-    m_log,
+    w->m_log,
     "worker %s has lost the controlling engine",
-    m_id
+    w->m_id
     );
 
   //m_loop.unloop(uv::ALL);
@@ -310,15 +326,18 @@ worker_t::process() {
             try {
               //it->second.downstream->push(message.data(), message.size());
               it->second->error(invocation_error, "unexpected exception");
-              m_streams.erase(it);
+              //m_streams.erase(it);
+              m_upstreams.erase(it);
             } catch(const std::exception& e) {
               //it->second.upstream->error(invocation_error, e.what());
               it->second->error(invocation_error, e.what());
-              m_streams.erase(it);
+              //m_streams.erase(it);
+              m_upstreams.erase(it);
             } catch(...) {
               //it->second.upstream->error(invocation_error, "unexpected exception");
               it->second->error(invocation_error, "unexpected exception");
-              m_streams.erase(it);
+              //m_streams.erase(it);
+              m_upstreams.erase(it);
             }
           }
 
@@ -347,7 +366,8 @@ worker_t::process() {
               it->second->error(invocation_error, "unexpected exception");
             }
                     
-            m_streams.erase(it);
+            //m_streams.erase(it);
+            m_upstreams.erase(it);
           }
 
           break;
@@ -382,4 +402,5 @@ worker_t::terminate(rpc::suicide::reasons reason,
   send<rpc::suicide>(static_cast<int>(reason), message);
   //m_loop.unloop(uv::ALL);
   //XXX
+  exit(0);
 }

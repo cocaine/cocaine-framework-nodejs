@@ -25,6 +25,10 @@ namespace nodeworker {
     
   // }
   
+  worker_t *worker;
+  std::unique_ptr<context_t> context;
+
+  
   int module_main(int argc, char * argv[]) {
     // int i;
     // for (i = 0; i < argc && i < 256; i++) {
@@ -91,8 +95,6 @@ namespace nodeworker {
 
     // Startup
 
-    std::unique_ptr<context_t> context;
-
     try {
       context.reset(new context_t(vm["configuration"].as<std::string>(), "slave"));
     } catch(const std::exception& e) {
@@ -100,15 +102,12 @@ namespace nodeworker {
       return EXIT_FAILURE;
     }
 
-    std::unique_ptr<worker_t> worker;
+    //std::unique_ptr<worker_t> worker;
 
     try {
-      worker.reset(
-        new worker_t(
+      worker=new worker_t(
           *context,
-          worker_config
-          )
-        );
+          worker_config);
     } catch(const std::exception& e) {
       std::unique_ptr<log_t> log(
         new log_t(*context, "main")

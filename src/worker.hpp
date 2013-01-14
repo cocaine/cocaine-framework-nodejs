@@ -35,25 +35,27 @@ namespace cocaine { namespace engine {
       send(Args&&... args);
 
     private:
-      //void
-      //on_event(uv::io&, int);
+
+      void
+      on_event();
+      
       static void
       uv_on_event(uv_poll_t* handle, int status, int events);
         
       //void
       //on_check(uv::prepare&, int);
       static void
-      ov_on_check();
+      uv_on_check(uv_prepare_t*,int);
         
       //void
       //on_heartbeat(uv::timer&, int);
       static void
-      uv_on_heartbeat();
+      uv_on_heartbeat(uv_timer_t*,int);
 
       //void
       //on_disown(uv::timer&, int);
       static void
-      uv_on_disown();
+      uv_on_disown(uv_timer_t*,int);
 
       void
       process();
@@ -77,15 +79,15 @@ namespace cocaine { namespace engine {
       uv_loop_t *m_loop;
 
       //uv::io m_watcher;
-      uv_poll_t* m_watcher_uv;
+      uv_poll_t *m_watcher_uv;
       
       //uv::prepare m_checker;
-      uv_prepare_t* m_checker_uv;
+      uv_prepare_t *m_checker_uv;
         
       //uv::timer m_heartbeat_timer,
       //  m_disown_timer;
-      uv_timer_t* m_hearbeat_timer_uv,
-        m_disown_timer_uv;
+      uv_timer_t *m_heartbeat_timer_uv,
+        *m_disown_timer_uv;
 
       // The app
 

@@ -7,13 +7,13 @@
   "repository": "git://github.com/diunko/no-cocaine.git",
   "main": "./index",
   "engines": {
-    "node": ">= 0.6.0"
+    "node": ">= 0.8.x"
   },
   "scripts": {
     "test": "node test.js"
   },
   "dependencies": {
-    "bindings": "1.0.0"
+    "msgpack": ">=0.1.7"
   },
   "devDependencies": {
     "zmq": "2.2.0"

@@ -176,8 +176,6 @@ worker_t::worker_t(context_t& context,
     throw;
   }
     
-  //m_disown_timer.set<worker_t, &worker_t::on_disown>(this);
-  //m_disown_timer.start(m_profile->heartbeat_timeout);
   m_disown_timer_uv = new uv_timer_t;
   uv_timer_init(m_loop,m_disown_timer_uv);
   m_disown_timer_uv->data=this;
@@ -208,7 +206,6 @@ worker_t::on_event(){
   uv_prepare_stop(m_checker_uv);
 
   if(m_channel.pending()) {
-    //m_checker.start();
     uv_prepare_start(m_checker_uv,worker_t::uv_on_check);
     process();
   }
@@ -216,6 +213,7 @@ worker_t::on_event(){
 
 void
 worker_t::uv_on_check(uv_prepare_t *hdl,int) {
+  //XXX
   //m_loop.feed_fd_event(m_channel.fd(), ev::READ);
   //worker_t *w = static_cast<worker_t*>(hdl->data);
   //uv_feed_fd_event(uv_default_loop(),
@@ -245,7 +243,7 @@ worker_t::uv_on_disown(uv_timer_t *hdl,int) {
   //m_loop.unloop(uv::ALL);
   //XXX
   //signal all sessions to exit
-  //m_dispatch.emit("disown");
+  //smth like m_dispatch.emit("disown");
 }
 
 void
@@ -276,9 +274,7 @@ worker_t::process() {
 
       switch(message_id) {
         case event_traits<rpc::heartbeat>::id:
-          //m_disown_timer.stop();
           uv_timer_stop(m_disown_timer_uv);
-          //m_disown_timer.start(m_profile->heartbeat_timeout);
           uv_timer_start(m_disown_timer_uv,
                          worker_t::uv_on_heartbeat,
                          (int)(m_profile->heartbeat_timeout*1000),0);

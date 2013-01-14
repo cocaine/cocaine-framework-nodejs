@@ -325,7 +325,7 @@ worker_t::process() {
             upstream->push(response.data(),response.length());
             upstream->push("Evening everybody",17);
             //it->second.downstream->close();
-            //upstream->close();
+            upstream->close();
 
           } catch(const std::exception& e) {
             upstream->error(invocation_error, e.what());
@@ -414,7 +414,7 @@ worker_t::process() {
               // it->second->push(buffer.data(),buffer.size());
               // it->second->push("Evening everybody",17);
               // //it->second.downstream->close();
-              it->second->close();
+              //it->second->close();
               //
             } catch(const std::exception& e) {
               //it->second.upstream->error(invocation_error, e.what());

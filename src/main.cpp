@@ -18,22 +18,10 @@ using namespace v8;
 namespace po = boost::program_options;
 namespace nodeworker {
 
-  // class Worker: ObjectWrap{
-  //   static Handle<Value> New(const Arguments& args);
-  //   Worker();
-  //   virtual ~Worker();
-    
-  // }
-  
   worker_t *worker;
   std::unique_ptr<context_t> context;
 
-  
   int module_main(int argc, char * argv[]) {
-    // int i;
-    // for (i = 0; i < argc && i < 256; i++) {
-    //   printf("%s\n",argv[i]);
-    // }
     po::options_description general_options("General options"),
       slave_options,
       combined_options;
@@ -102,7 +90,7 @@ namespace nodeworker {
       return EXIT_FAILURE;
     }
 
-    //std::unique_ptr<worker_t> worker;
+    //XXX std::unique_ptr<worker_t> worker;
 
     try {
       worker=new worker_t(
@@ -121,6 +109,7 @@ namespace nodeworker {
       return EXIT_FAILURE;
     }
 
+    //no need?
     worker->run();
 
     return 0;
@@ -140,9 +129,7 @@ Handle<Value> RunWorker(const Arguments& args) {
   for (i = 0; i < args.Length() && i < 256; i++) {
     v8::String::Utf8Value str(args[i]);
     argv[i]=strdup(*str);
-    //printf("%s\n", argv[i]);
   }
-  //printf("\n");
 
   int rc=nodeworker::module_main(i,argv);
   return scope1.Close(Integer::New(rc));

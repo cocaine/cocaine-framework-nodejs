@@ -21,93 +21,6 @@ using namespace cocaine::logging;
 
 namespace fs = boost::filesystem;
 
-namespace {
-  struct upstream_t:
-    public api::stream_t
-  {
-    upstream_t(const unique_id_t& id,
-               worker_t * const worker):
-      m_id(id),
-      m_worker(worker),
-      m_state(state_t::open)
-      { }
-
-    virtual
-    ~upstream_t() {
-      if(m_state != state_t::closed) {
-        close();
-      }
-    }
-
-    virtual
-    void
-    push(const char * chunk,
-         size_t size) {
-      switch(m_state) {
-        case state_t::open:
-          send<rpc::chunk>(std::string(chunk, size));
-                    
-          break;
-
-        case state_t::closed:
-          throw cocaine::error_t("the stream has been closed");
-      }
-    }
-
-    virtual
-    void
-    error(error_code code,
-          const std::string& message) {
-      switch(m_state) {
-        case state_t::open:
-          m_state = state_t::closed;
-
-          send<rpc::error>(static_cast<int>(code), message);
-          send<rpc::choke>();
-
-          break;
-
-        case state_t::closed:
-          throw cocaine::error_t("the stream has been closed");
-      }
-    }
-
-    virtual
-    void
-    close() {
-      switch(m_state) {
-        case state_t::open:
-          m_state = state_t::closed;
-
-          send<rpc::choke>();
-
-          break;
-
-        case state_t::closed:
-          throw cocaine::error_t("the stream has been closed");
-      }
-    }
-
-  private:
-    template<class Event, typename... Args>
-    void
-    send(Args&&... args) {
-      m_worker->send<Event>(m_id, std::forward<Args>(args)...);
-    }
-
-  private:
-    const unique_id_t m_id;
-    worker_t * const m_worker;
-
-    enum class state_t: int {
-      open,
-        closed
-        };
-
-    state_t m_state;
-  };
-}
-
 worker_t::worker_t(context_t& context,
                    worker_config_t config):
   m_context(context),
@@ -121,34 +34,23 @@ worker_t::worker_t(context_t& context,
     m_context.config.path.runtime,
     config.app);
 
-  printf("i'm %p\n",(void*)this);
-  std::cout << "connecting to:" << endpoint << std::endl;
-    
   m_channel.connect(endpoint);
 
   COCAINE_LOG_ERROR(
     m_log,
     "%s: evening everybody",
-    m_id
-    );
+    m_id);
   
-  printf("pending %d\n",m_channel.pending());
-  //m_watcher.set<worker_t, &worker_t::on_event>(this);
-  //m_watcher.start(m_channel.fd(), uv::READ);
   m_watcher_uv = new uv_poll_t;
   uv_poll_init(m_loop,m_watcher_uv,m_channel.fd());
   m_watcher_uv->data=this;
   uv_poll_start(m_watcher_uv, UV_READABLE, worker_t::uv_on_event);
 
-  //m_checker.set<worker_t, &worker_t::on_check>(this);
-  //m_checker.start();
   m_checker_uv = new uv_prepare_t;
   uv_prepare_init(m_loop,m_checker_uv);
   m_checker_uv->data=this;
   uv_prepare_start(m_checker_uv,worker_t::uv_on_check);
 
-  //m_heartbeat_timer.set<worker_t, &worker_t::on_heartbeat>(this);
-  //m_heartbeat_timer.start(0.0f, 5.0f);
   m_heartbeat_timer_uv = new uv_timer_t;
   uv_timer_init(m_loop,m_heartbeat_timer_uv);
   m_heartbeat_timer_uv->data=this;
@@ -162,14 +64,6 @@ worker_t::worker_t(context_t& context,
     m_manifest.reset(new manifest_t(m_context, config.app));
     m_profile.reset(new profile_t(m_context, config.profile));
         
-    fs::path path = fs::path(m_context.config.path.spool) / config.app;
-         
-    // m_sandbox = new JsSandbox(
-    //   m_contect,
-    //   m_manifest->name,
-    //   m_manifest->sandbox.args,
-    //   path.string())
-    
   } catch(const std::exception& e) {
     terminate(rpc::suicide::abnormal, e.what());
     throw;
@@ -197,8 +91,7 @@ worker_t::run() {
 
 void
 worker_t::uv_on_event(uv_poll_t* hdl, int status, int events) {
-  //BOOST_ASSERT(status==0);
-  printf("worker %p got event\n",hdl->data);
+  BOOST_ASSERT(status==0);
   worker_t *w = static_cast<worker_t*>(hdl->data);
   w->on_event();
 }
@@ -217,16 +110,11 @@ void
 worker_t::uv_on_check(uv_prepare_t *hdl,int) {
   //XXX
   //m_loop.feed_fd_event(m_channel.fd(), ev::READ);
-  //worker_t *w = static_cast<worker_t*>(hdl->data);
-  //uv_feed_fd_event(uv_default_loop(),
-  //                 w->m_channel.fd(),
-  //                 UV_READABLE);
 }
 
 void
 worker_t::uv_on_heartbeat(uv_timer_t *hdl,int) {
   worker_t *w = static_cast<worker_t*>(hdl->data);
-  printf("beat\n");
   scoped_option<
     options::send_timeout
     > option(w->m_channel, 0);
@@ -239,13 +127,9 @@ worker_t::uv_on_disown(uv_timer_t *hdl,int) {
   COCAINE_LOG_ERROR(
     w->m_log,
     "worker %s has lost the controlling engine",
-    w->m_id
-    );
-
-  //m_loop.unloop(uv::ALL);
+    w->m_id);
   //XXX
-  //signal all sessions to exit
-  //smth like m_dispatch.emit("disown");
+  //m_loop.unloop(uv::ALL);
 }
 
 void
@@ -293,44 +177,23 @@ worker_t::process() {
             "worker %s session %s: received event %s",
             m_id,session_id.string(),event);
 
-          boost::shared_ptr<api::stream_t> upstream(
-            boost::make_shared<upstream_t>(session_id, this)
-            );
+          boost::shared_ptr<Stream::Shared> stream(
+            Stream::New(session_id,this));
 
           try {
-            // io_pair_t io = {
-            //   upstream,
-            //   m_sandbox->invoke(event, upstream)
-            // };
-
-            //m_streams.emplace(session_id, io);
-            m_upstreams.emplace(session_id, upstream);
-
-            Json::Value v;
-            v["code"] = 200;
-            Json::Value hdr;
-            hdr.append("Content-Type");
-            hdr.append("text/plain");
-            v["headers"].append(hdr);
-            std::ostringstream s;
-            msgpack::packer<std::ostringstream> packer(s);
-            io::type_traits<Json::Value>::pack(packer, v);
-            std::string response = s.str();
+            m_streams.emplace(session_id, stream);
 
             COCAINE_LOG_ERROR(
               m_log,
-              "worker %s session %s: responding",
+              "worker %s session %s: started session",
               m_id,session_id.string());
 
-            upstream->push(response.data(),response.length());
-            upstream->push("Evening everybody",17);
-            //it->second.downstream->close();
-            upstream->close();
-
+            this->on_invoke(event,stream);
+            
           } catch(const std::exception& e) {
-            upstream->error(invocation_error, e.what());
+            stream->error(invocation_error, e.what());
           } catch(...) {
-            upstream->error(invocation_error, "unexpected exception");
+            stream->error(invocation_error, "unexpected exception");
           }
 
           break;
@@ -346,28 +209,22 @@ worker_t::process() {
             "worker %s session %s: received chunk length %d",
             m_id,session_id.string(),message.size());
             
-          // //stream_map_t::iterator it(m_streams.find(session_id));
-          // upstream_map_t::iterator it(m_upstreams.find(session_id));
+          stream_map_t::iterator it(m_streams.find(session_id));
 
-          // // NOTE: This may be a chunk for a failed invocation, in which case there
-          // // will be no active stream, so drop the message.
-          // if(it != m_upstreams.end()) {
-          //   try {
-          //     //it->second.downstream->push(message.data(), message.size());
-          //     //m_streams.erase(it);
-          //     //m_upstreams.erase(it);
-          //   } catch(const std::exception& e) {
-          //     //it->second.upstream->error(invocation_error, e.what());
-          //     it->second->error(invocation_error, e.what());
-          //     //m_streams.erase(it);
-          //     m_upstreams.erase(it);
-          //   } catch(...) {
-          //     //it->second.upstream->error(invocation_error, "unexpected exception");
-          //     it->second->error(invocation_error, "unexpected exception");
-          //     //m_streams.erase(it);
-          //     m_upstreams.erase(it);
-          //   }
-          // }
+          // NOTE: This may be a chunk for a failed invocation, in which case there
+          // will be no active stream, so drop the message.
+          if(it != m_streams.end()) {
+            try {
+              it->second->on_data(message.data(),
+                                  message.size());
+            } catch(const std::exception& e) {
+              it->second->error(invocation_error, e.what());
+              m_streams.erase(it);
+            } catch(...) {
+              it->second->error(invocation_error, "unexpected exception");
+              m_streams.erase(it);
+            }
+          }
 
           break;
         }
@@ -382,50 +239,26 @@ worker_t::process() {
             "worker %s session %s: received close",
             m_id,session_id.string());
 
-          //stream_map_t::iterator it = m_streams.find(session_id);
-          upstream_map_t::iterator it = m_upstreams.find(session_id);
+          stream_map_t::iterator it = m_streams.find(session_id);
 
           // NOTE: This may be a choke for a failed invocation, in which case there
           // will be no active stream, so drop the message.
-          if(it != m_upstreams.end()) {
+          if(it != m_streams.end()) {
             try {
-              // std::map<
-              //   std::string,
-              //   std::string> res;
+              COCAINE_LOG_ERROR(
+                m_log,
+                "worker %s session %s: input end",
+                m_id,session_id.string());
 
-              // std::map<
-              //   std::string,
-              //   std::string> hh;
-          
-              // hh[(std::string)"X-By"]=(std::string)"coca-worker";
-
-              // res[(std::string)"code"]=(std::string)"200";
-              // //res[(std::string)"headers"]=hh;
-
-              // msgpack::sbuffer buffer;
-              // msgpack::packer<msgpack::sbuffer> packer(buffer);
-
-              // packer << res;
-              // COCAINE_LOG_ERROR(
-              //   m_log,
-              //   "worker %s session %s: responding",
-              //   m_id,session_id.string());
-
-              // it->second->push(buffer.data(),buffer.size());
-              // it->second->push("Evening everybody",17);
-              // //it->second.downstream->close();
-              //it->second->close();
-              //
+              it->second->on_end();
+              m_streams.erase(it);
+              
             } catch(const std::exception& e) {
-              //it->second.upstream->error(invocation_error, e.what());
               it->second->error(invocation_error, e.what());
             } catch(...) {
-              //it->second.upstream->error(invocation_error, "unexpected exception");
               it->second->error(invocation_error, "unexpected exception");
             }
                     
-            //m_streams.erase(it);
-            m_upstreams.erase(it);
           }
 
           break;

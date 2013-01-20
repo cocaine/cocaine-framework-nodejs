@@ -10,8 +10,16 @@
 
 #include <nodejs/node.h>
 
-namespace cocaine { namespace engine {
+#if BOOST_VERSION >= 103600
+#  define MAP_TYPE boost::unordered_map
+#else
+#  define MAP_TYPE std::map
+#endif
 
+
+
+namespace cocaine { namespace engine {
+    
     struct worker_config_t {
       std::string app;
       std::string profile;
@@ -21,6 +29,32 @@ namespace cocaine { namespace engine {
     class worker_t:
     public boost::noncopyable
     {
+      context_t&   m_context;
+      std::unique_ptr<logging::log_t> m_log;
+
+      io::unique_channel_t m_channel;
+        
+      // Event loop
+      uv_loop_t    *m_loop;
+      uv_poll_t    *m_watcher_uv;
+      uv_prepare_t *m_checker_uv;
+      uv_timer_t   *m_heartbeat_timer_uv;
+      uv_tiemr_t   *m_disown_timer_uv;
+
+      // The app
+
+      std::unique_ptr<const manifest_t> m_manifest;
+      std::unique_ptr<const profile_t>  m_profile;
+      std::unique_ptr<api::sandbox_t>   m_sandbox;
+
+      // Session streams.
+      typedef MAP_TYPE <
+        unique_id_t,
+        boost::shared_ptr<Stream::Shared>
+        > stream_map_t;
+      
+      stream_map_t m_streams;
+      
     public:
       worker_t(context_t& context,
                worker_config_t config);
@@ -42,18 +76,12 @@ namespace cocaine { namespace engine {
       static void
       uv_on_event(uv_poll_t* handle, int status, int events);
         
-      //void
-      //on_check(uv::prepare&, int);
       static void
       uv_on_check(uv_prepare_t*,int);
         
-      //void
-      //on_heartbeat(uv::timer&, int);
       static void
       uv_on_heartbeat(uv_timer_t*,int);
 
-      //void
-      //on_disown(uv::timer&, int);
       static void
       uv_on_disown(uv_timer_t*,int);
 
@@ -64,63 +92,6 @@ namespace cocaine { namespace engine {
       terminate(io::rpc::suicide::reasons reason,
                 const std::string& message);
 
-    private:
-      context_t& m_context;
-      std::unique_ptr<logging::log_t> m_log;
-
-      // Configuration
-      const unique_id_t m_id;
-
-      // Engine I/O
-      io::unique_channel_t m_channel;
-        
-      // Event loop
-      //uv::default_loop m_loop;
-      uv_loop_t *m_loop;
-
-      //uv::io m_watcher;
-      uv_poll_t *m_watcher_uv;
-      
-      //uv::prepare m_checker;
-      uv_prepare_t *m_checker_uv;
-        
-      //uv::timer m_heartbeat_timer,
-      //  m_disown_timer;
-      uv_timer_t *m_heartbeat_timer_uv,
-        *m_disown_timer_uv;
-
-      // The app
-
-      std::unique_ptr<const manifest_t> m_manifest;
-      std::unique_ptr<const profile_t> m_profile;
-      std::unique_ptr<api::sandbox_t> m_sandbox;
-
-      struct io_pair_t {
-        boost::shared_ptr<api::stream_t> upstream;
-        boost::shared_ptr<api::stream_t> downstream;
-      };
-
-#if BOOST_VERSION >= 103600
-      typedef boost::unordered_map<
-#else
-        typedef std::map<
-#endif
-          unique_id_t,
-          io_pair_t
-          > stream_map_t;
-
-#if BOOST_VERSION >= 103600
-      typedef boost::unordered_map<
-#else
-        typedef std::map<
-#endif
-          unique_id_t,
-          boost::shared_ptr<api::stream_t>
-          > upstream_map_t;
-
-      // Session streams.
-      //stream_map_t m_streams;
-      upstream_map_t m_upstreams;
     };
 
     template<class Event, typename... Args>

@@ -34,6 +34,7 @@ L.log("starting",Date())
 var W=new _Worker(options)
 
 W._on_open=function(stream){
+  stream.bufs=[]
   L.log("got connection",stream)
   stream.write(
     mp.pack({code:200,

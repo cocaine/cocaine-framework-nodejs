@@ -20,8 +20,6 @@ var stub={
   configuration:"/etc/cocaine/cocaine.conf",
 }
 
-
-
 var options={
   app:argv[ai["--app"]+1],
   profile:argv[ai["--profile"]+1],
@@ -51,7 +49,5 @@ W._on_open=function(stream){
 
 W.run()
 
-L.log("stopping",Date())
-
-
+process.worker=W
 

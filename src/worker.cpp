@@ -88,7 +88,10 @@ namespace cocaine { namespace engine {
     }
 
     worker_t::~worker_t() {
-      // Empty.
+      uv_poll_stop(m_watcher_uv);
+      uv_prepare_stop(m_checker_uv);
+      uv_timer_stop(m_heartbeat_timer_uv);
+      uv_timer_stop(m_disown_timer_uv);  
     }
 
     void
@@ -368,7 +371,6 @@ namespace cocaine { namespace engine {
 
       worker->Wrap(args.This());
 
-      worker->Ref();
   
       return args.This();
 

@@ -1,14 +1,35 @@
-#ifndef COCAINE_GENERIC_WORKER_HPP
-#define COCAINE_GENERIC_WORKER_HPP
 
+#ifndef __NOCOCAINE_WORKER_HPP__
+#define __NOCOCAINE_WORKER_HPP__
+
+
+#include <nodejs/node.h>
+#include <nodejs/node_buffer.h>
 #include <cocaine/common.hpp>
 #include <cocaine/rpc.hpp>
 #include <cocaine/unique_id.hpp>
-//#include "uv++.h"
+#include <cocaine/context.hpp>
+#include <cocaine/logging.hpp>
+#include <cocaine/manifest.hpp>
+#include <cocaine/profile.hpp>
 
-#include <cocaine/api/stream.hpp>
+#include <cocaine/api/sandbox.hpp>
 
-#include <nodejs/node.h>
+#include <cocaine/traits/unique_id.hpp>
+#include <cocaine/traits.hpp>
+#include <cocaine/traits/json.hpp>
+
+#include <boost/filesystem/path.hpp>
+
+using namespace cocaine;
+using namespace cocaine::engine;
+using namespace cocaine::io;
+using namespace cocaine::logging;
+using namespace v8;
+using namespace node;
+
+namespace fs = boost::filesystem;
+
 
 #if BOOST_VERSION >= 103600
 #  define MAP_TYPE boost::unordered_map
@@ -16,9 +37,9 @@
 #  define MAP_TYPE std::map
 #endif
 
-
-
 namespace cocaine { namespace engine {
+
+    class Stream;
     
     struct worker_config_t {
       std::string app;
@@ -27,10 +48,11 @@ namespace cocaine { namespace engine {
     };
 
     class worker_t:
-    public boost::noncopyable
+    public boost::noncopyable, public ObjectWrap
     {
-      context_t&   m_context;
+      context_t&                      m_context;
       std::unique_ptr<logging::log_t> m_log;
+      unique_id_t                     m_id;
 
       io::unique_channel_t m_channel;
         
@@ -39,7 +61,7 @@ namespace cocaine { namespace engine {
       uv_poll_t    *m_watcher_uv;
       uv_prepare_t *m_checker_uv;
       uv_timer_t   *m_heartbeat_timer_uv;
-      uv_tiemr_t   *m_disown_timer_uv;
+      uv_timer_t   *m_disown_timer_uv;
 
       // The app
 
@@ -66,7 +88,30 @@ namespace cocaine { namespace engine {
 
       template<class Event, typename... Args>
       void
-      send(Args&&... args);
+      send(Args&&... args) {
+        m_channel.send<Event>(std::forward<Args>(args)...);
+      }
+
+      //---- js->c api ----
+      
+      static Handle<Value>
+      New(const Arguments &args);
+      
+      static Handle<Value>
+      Run(const Arguments &args);
+
+      //---- c->js callbacks ----
+
+      void
+      on_open(std::string &event, Stream *s);
+      
+      void
+      on_stop();
+
+      //----------------
+
+      static void
+      Initialize(Handle<Object> target);
 
     private:
 
@@ -94,11 +139,9 @@ namespace cocaine { namespace engine {
 
     };
 
-    template<class Event, typename... Args>
-    void
-    worker_t::send(Args&&... args) {
-      m_channel.send<Event>(std::forward<Args>(args)...);
-    }
-  }} // namespace cocaine::engine
+  }
+} // namespace cocaine::engine
+
 
 #endif
+

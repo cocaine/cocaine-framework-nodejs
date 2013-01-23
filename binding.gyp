@@ -2,7 +2,7 @@
   'targets': [
     {
       'target_name': 'cocaine',
-      'sources': [ 'src/main.cpp','src/worker.cpp'],
+      'sources': [ 'src/worker.cpp', 'src/stream.cpp'],
       'libraries': ['-lcocaine-core -lboost_program_options-mt'],
       'ldflags':['-Wl,-Bsymbolic-functions','-rdynamic'],
       'cflags': ['-std=c++0x','-g','-O0'],

@@ -251,6 +251,8 @@ namespace cocaine { namespace engine {
 
               m_channel.recv<rpc::choke>(session_id);
 
+              std::cout << "worker got <end> event" << std::endl;
+
               COCAINE_LOG_ERROR(
                 m_log,
                 "worker %s session %s: received close",

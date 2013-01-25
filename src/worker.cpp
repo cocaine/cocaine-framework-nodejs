@@ -15,24 +15,14 @@ namespace cocaine { namespace engine {
     void
     worker_t::on_open(std::string &evt, Stream *s){
       HandleScope scope;
-      Local<Value> cb = this->handle_->Get(on_open_sym);
-      if(!cb->IsFunction()){
-        return;
-      }
       Local<Value> argv[1] =
         {Local<Value>::New(s->handle_)};
-      TryCatch try_catch;
-      cb.As<Function>()->Call(this->handle_,1,argv);
+      MakeCallback(handle_,on_open_sym,1,argv);
     }
       
     void
     worker_t::on_stop(){
-      HandleScope scope;
-      Local<Value> cb = this->handle_->Get(on_stop_sym);
-      if(!cb->IsFunction()){
-        return;
-      }
-      cb.As<Function>()->Call(this->handle_,0,NULL);
+      MakeCallback(handle_,on_stop_sym,0,NULL);
     }
 
     worker_t::worker_t(context_t& context,

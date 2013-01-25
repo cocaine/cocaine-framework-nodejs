@@ -92,32 +92,20 @@ namespace cocaine { namespace engine {
     Stream::on_data(const char *data, size_t len){
       std::cout << "stream: got <data> event" << std::endl;
       HandleScope scope;
-      Local<Value> cb = this->handle_->Get(on_data_sym);
-      if(!cb->IsFunction()){
-        return;
-      }
 
       Buffer *b=Buffer::New(const_cast<char*>(data),len); //make some heat
 
-      const unsigned argc=1;
-      Local<Value> argv[argc] =
+      Local<Value> argv[1] =
         {Local<Value>::New(b->handle_)};
 
-      TryCatch try_catch;
-      cb.As<Function>()->Call(this->handle_,1,argv);
-    
+      MakeCallback(handle_,on_data_sym,1,argv);
+
     }
 
     void
     Stream::on_end(){
       std::cout << "stream: got <end> event" << std::endl;
-      HandleScope scope;
-      Local<Value> cb = this->handle_->Get(on_end_sym);
-      if(!cb->IsFunction()){
-        return;
-      }
-
-      cb.As<Function>()->Call(this->handle_,0,NULL);
+      MakeCallback(handle_,on_end_sym,0,NULL);
     }
 
     //---- cocaine rpc ----

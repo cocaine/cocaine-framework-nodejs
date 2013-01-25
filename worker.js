@@ -2,7 +2,7 @@
 
 var fs=require("fs")
 
-var Logger=require("./log")
+var Logger=require("./lib/log")
 
 var Server=require("./lib/server")
 

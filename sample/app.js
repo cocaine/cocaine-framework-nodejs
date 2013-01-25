@@ -7,8 +7,8 @@ function App(Server,options){
     console.log("js got request")
     var body=""
     
-    //rq.on("data",function(chunk){
-    //  console.log("js got body chunk")})
+    rq.on("data",function(chunk){
+      console.log("js got body chunk")})
     
     rq.on("end",function(){
       console.log("js got end")

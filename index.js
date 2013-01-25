@@ -1,8 +1,15 @@
 
 
+var Worker=require("./lib/worker")
 
-var Run = require("./build/Release/cocaine.node").run;
-//var events = require("events");
+var Server=require("./lib/server")
 
-//Worker.prototype.__proto__=events.EventEmitter.prototype
-exports.Run = Run;
+var worker=require("./worker")
+
+module.exports={
+  Worker:Worker,
+  Server:Server,
+  worker:worker
+}
+
+

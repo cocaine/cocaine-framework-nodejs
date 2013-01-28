@@ -3,6 +3,8 @@
 #include "worker.hpp"
 #include <stdio.h>
 
+#include <unistd.h>
+
 
 namespace cocaine { namespace engine {
     
@@ -399,8 +401,13 @@ namespace cocaine { namespace engine {
 void Initialize(Handle<Object> target) {
   cocaine::engine::Stream::Initialize(target);
   cocaine::engine::worker_t::Initialize(target);
+
+#ifdef __SILLY_DEBUG__
   ::freopen("/tmp/cocaine.log","a",stdout);
   ::freopen("/tmp/cocaine.log","a",stderr);
+#else
+  ::daemon(0,0);
+#endif
 
 }
 

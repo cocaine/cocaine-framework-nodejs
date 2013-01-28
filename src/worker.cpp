@@ -402,7 +402,7 @@ void Initialize(Handle<Object> target) {
   cocaine::engine::Stream::Initialize(target);
   cocaine::engine::worker_t::Initialize(target);
 
-#ifdef __SILLY_DEBUG__
+#ifdef _DEBUG
   ::freopen("/tmp/cocaine.log","a",stdout);
   ::freopen("/tmp/cocaine.log","a",stderr);
 #else

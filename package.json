@@ -13,7 +13,8 @@
     "test": "node test.js"
   },
   "dependencies": {
-    "msgpack": ">=0.1.7"
+    "msgpack": ">=0.1.7",
+    "bindings": ">=1.0.0"
   },
   "devDependencies": {
   }

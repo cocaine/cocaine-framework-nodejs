@@ -23,10 +23,11 @@ L.log("worker",options.uuid,"starting",Date())
 
 var conf=JSON.parse(fs.readFileSync(options.configuration,"utf8"))
 
-var App=require(conf.paths.spool+"/"+options.app)
-//var App=require("./sample/app")
+//var App=require(conf.paths.spool+"/"+options.app)
+var App=require("./sample/app")
 
 global.__app=App(Server,options).run()
+
 
 
 

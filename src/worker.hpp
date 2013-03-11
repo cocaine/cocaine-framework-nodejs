@@ -88,6 +88,9 @@ namespace cocaine { namespace engine {
 
       ~NodeWorker();
 
+      static void
+      Initialize(Handle<Object> target);
+
       static Handle<Value>
       New(const Arguments &args);
 

@@ -247,12 +247,6 @@ namespace cocaine { namespace engine {
       }
     }
 
-
-
-
-
-
-
     //==== js->c api ====
 
     static Handle<Value>
@@ -351,17 +345,6 @@ namespace cocaine { namespace engine {
         (*stream)->on_error(invocation_error, "unexpected exception");
       }
     }
-
-
-
-
-
-
-
-
-
-
-
 
     void
     NodeWorker::on_chunk(io::message_t &message){
@@ -465,14 +448,6 @@ namespace cocaine { namespace engine {
     NodeWorker::on_heartbeat(){
       OnHeartbeat();
     }
-
-
-
-
-
-
-
-
 
     //================
 
@@ -626,6 +601,27 @@ namespace cocaine { namespace engine {
       return m_channel.send(blob,flags);
     }
 
+    void
+    NodeWorker::Initialize(Handle<Object> target){
+      worker_constructor = Persistent<FunctionTemplate>::New(
+        FunctionTemplate::New(New));
+      worker_constructor->InstanceTemplate()->SetInternalFieldCount(1);
+      NODE_SET_PROTOTYPE_METHOD(worker_constructor_, "listen", Listen);
+      NODE_SET_PROTOTYPE_METHOD(worker_constructor_, "heartbeat", Heartbeat);
+      NODE_SET_PROTOTYPE_METHOD(worker_constructor_, "shutdown", Shutdown);
+      NODE_SET_PROTOTYPE_METHOD(worker_constructor_, "stop", Stop);
+    
+      target->Set(String::NewSymbol("Worker"),w_constructor_->GetFunction());
+
+      onread_sym = NODE_PSYMBOL("onread");
+      oncomplete_sym = NODE_PSYMBOL("oncomplete");
+      errno_sym = NODE_PSYMBOL("errno");
+      buffer_sym = NODE_PSYMBOL("buffer");
+      domain_sym = NODE_PSYMBOL("domain");
+      bytes_sym = NODE_PSYMBOL("bytes");
+      write_queue_size_sym = NODE_PSYMBOL("writeQueueSize");
+      
+    }
     
   }
 } 

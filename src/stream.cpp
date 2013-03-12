@@ -1,11 +1,9 @@
 
-
 #include "common.hpp"
 #include "req.hpp"
 
-
 namespace cocaine { namespace engine {
-
+    
     //==== js->c api ====
       
     Handle<Value>
@@ -29,8 +27,8 @@ namespace cocaine { namespace engine {
       }
       WriteReq *w = make_write_req(buf);
       m_write_queue_size += w.length;
-      ngx_queue_append(&m_writereq_q,
-                       &(w->m_writereq_q));
+      ngx_queue_append(&m_req_q,
+                       &(w->m_req_q));
       set_want_write(true);
       return scope.Close(w->handle_);
     }
@@ -44,7 +42,7 @@ namespace cocaine { namespace engine {
         case st::read_end:
           m_state = st::shutdown;
           m_shutdown_req = make_shutdown_req();
-          m_worker->requests_enq(this);
+          m_worker->pending_enq(this);
           return scope.Close(m_shutdown_req->handle_);
         case st::duplex:
         case st::writing:
@@ -69,7 +67,10 @@ namespace cocaine { namespace engine {
     Stream::Close(){
       if(m_state < st::closed){
         m_state = st::closed;
-        m_worker->requests_enq(this);
+        //m_worker->writing_deq(this); // not. we'd rather
+        //   check stream state after each callback in
+        //   on_try_write or on_data instead
+        m_worker->pending_enq(this);
       }
       return Undefined();
     }
@@ -77,9 +78,11 @@ namespace cocaine { namespace engine {
     //==== js completion helpers ====
 
     void
-    Stream::AfterWrite(WriteReq *w){
-      w->on_complete();
-      delete w;
+    Stream::OnWrite(WriteReq *w){
+      bool r=m_worker->send_raw(w->msg); // can throw
+      if(r){
+        w->on_complete();}
+      return r;
     }
       
     void
@@ -101,22 +104,31 @@ namespace cocaine { namespace engine {
     }
 
     void
-    Stream::OnRead(){
+    Stream::OnRead(Buffer *b){
+      HandleScope scope;
+      if(b){
+        Local<Value> args[1]={
+          Local<Value>::New(b->handle_)}
+        MakeCallback(handle_,onread_sym,1,argv);
+      } else {
+        SetErrno(UV_EOF);
+        MakeCallback(handle_,onread_sym,0,NULL);
+      }
     }
 
     //================
 
     Stream::Stream(const uint64_t &id,
-           NodeWorker *const worker):
+                   NodeWorker *const worker):
       m_id(id),
       m_worker(worker),
-      m_state(state_t::reading)
+      m_state(st::reading)
     {
       //Empty
     }
 
     Stream::~Stream(){
-      BOOST_ASSERT(m_state = st::closed);
+      assert(m_state = st::closed);
     }
 
     Handle<Value>
@@ -148,7 +160,8 @@ namespace cocaine { namespace engine {
     }
 
     //==== loop callbacks ====
-
+    
+    // called from Worker::on_shutdown
     void
     Stream::on_shutdown(){
       switch(m_state){
@@ -171,6 +184,7 @@ namespace cocaine { namespace engine {
       }
     }
 
+    // called from Worker::on_stop
     void
     Stream::on_stop(){
       if(m_state != st::closed){
@@ -179,13 +193,14 @@ namespace cocaine { namespace engine {
       }
     }
       
+    // called from Worker::on_prepare
     bool
     Stream::on_prepare(){
       if(m_state == st::closed){
         OnClose();
       }
       if(m_state == st::shutdown){
-        if(ngx_queue_empty(&m_writing_reqs_q)){
+        if(ngx_queue_empty(&m_req_q)){
           AfterShutdown();
         }
       }
@@ -193,40 +208,63 @@ namespace cocaine { namespace engine {
       
     bool
     Stream::on_try_write1(){
-      assert(m_want_write
-             && !(ngx_queue_empty(&m_write_req)));
-      ngx_queue_t *q = ngx_queue_head(&m_writereq_q);
-      WriteReq *w = ngx_queue_data(&m_writereq_q,
-                                   WriteReq,
-                                   m_writereq_q);
+      if(m_state < st::closed){
+        assert(m_want_write
+               && !(ngx_queue_empty(&m_req_q)));
+        ngx_queue_t *q = ngx_queue_head(&m_req_q);
+        WriteReq *w = ngx_queue_data(&m_req_q,
+                                     WriteReq,
+                                     m_req_q);
 
-      bool r = m_worker->send_raw(w->msg); // can throw
+        if(!OnWrite(w)){ // can throw
+          return false;
+        }
+        ngx_queue_remove(q);
+        delete w;
         
-      if(!r){
-        return false;}
-
-      if(ngx_queue_empty(&m_writereq_q)){
-        set_want_write(false);
+        if(ngx_queue_empty(&m_writereq_q)){
+          set_want_write(false);
+        }
+        return true;
       }
-        
-      AfterWrite(w);
-      return true;
     }
 
     void
     Stream::on_data(char *data, size_t size){
-      HandleScope scope;
+      switch(m_state){
+        case st::reading:
+        case st::duplex:
+          break;
+        case st::read_ended:
+        case st::writing;
+        case st::shutdown:
+        case st::closed:
+          // drop or throw
+          return;
+      }
       Buffer *b=Buffer::New(const_cast<char*>(data),len); //make some heat
-      Local<Value> argv[1] =
-        {Local<Value>::New(b->handle_)};
-      MakeCallback(handle_,onread_sym,1,argv);
+      OnRead(b);
     }
 
     void
     Stream::on_end(){
-      HandleScope scope;
-      SetErrno(UV_EOF);
-      MakeCallback(handle_,onread_sym,0,NULL);
+      switch(m_state){
+        case st::reading:
+          m_state = st::read_ended;
+          break;
+        case st::read_ended:
+          //throw
+          break;
+        case st::duplex:
+          m_state = st::writing;
+          break;
+        case st::writing;
+        case st::shutdown:
+        case st::closed:
+          //drop incoming message
+          return;
+      }
+      OnRead(NULL);
     }
 
     void
@@ -237,14 +275,13 @@ namespace cocaine { namespace engine {
         send<rpc::choke>();
         OnClose();
       }
-        
     }
 
     //================
 
     boost::shared_ptr<Stream::Shared>
     Stream::MakeShared(const uint64_t& id,
-               worker_t * const worker){
+                       worker_t * const worker){
       return boost::make_shared<Stream::Shared>(
         Stream::New(id,worker));
     }
@@ -252,7 +289,8 @@ namespace cocaine { namespace engine {
     void
     Stream::set_want_write(bool want){
       if(want && !m_want_write){
-        BOOST_ASSERT(state != st::shutdown && state != st::closed);
+        assert(state != st::shutdown && state != st::closed);
+        m_want_write = want;
         m_worker->writing_enq(this);
       } else if(!want && m_want_write){
         m_want_write = want;
@@ -266,11 +304,11 @@ namespace cocaine { namespace engine {
     void
     Stream::cancel_and_destroy_reqs(){
       ngx_queue_t* q = NULL;
-      while(!ngx_queue_empty(&m_writereq_q)){
-        q = ngx_queue_head(&m_writereq_q);
+      while(!ngx_queue_empty(&m_req_q)){
+        q = ngx_queue_head(&m_wrreq_q);
         ngx_queue_remove(q);
-        WriteWrap *w = ngx_queue_data(q,WriteWrap,m_writereq_q);
-        BOOST_ASSERT(w->stream == this);
+        WriteWrap *w = ngx_queue_data(q,WriteWrap,m_req_q);
+        assert(w->stream == this);
         w->on_cancel();
         delete w;
       }
@@ -283,19 +321,15 @@ namespace cocaine { namespace engine {
 
     WriteReq*
     Stream::make_write_req(Handle<Object> buf){
-      WriteReq *req = new WriteReq();
-      req->stream = this;
-      req->length = Buffer::Length(buf);
+      WriteReq *req = new WriteReq(this,buf);
       req->msg = m_worker->pack_msg<rpc::chunk>(
         m_id, std::string(buf->Data(),buf->Length()));
-      req->object_->SetHiddenValue(buffer_sym, buf->handle_);
       return req;
     }
 
     ShutdownReq*
     Stream::make_shutdown_req(){
-      ShutdownReq *req = new ShutdownReq();
-      req->stream = this;
+      ShutdownReq *req = new ShutdownReq(this);
       return req;
     }
       

@@ -34,6 +34,7 @@ namespace cocaine { namespace engine {
       bool m_close_pending;
 
       //==== js->c api ====
+    public:
       
       static Handle<Value>
       WriteBuffer(const Arguments &args);
@@ -45,7 +46,7 @@ namespace cocaine { namespace engine {
       Close();
 
       //==== js completion helpers ====
-
+    private:
       void
       AfterWrite(WriteReq *w);
       
@@ -64,6 +65,8 @@ namespace cocaine { namespace engine {
              NodeWorker *const worker);
 
       ~Stream();
+
+    public:
 
       static Handle<Value>
       New(const Arguments &args);
@@ -99,6 +102,7 @@ namespace cocaine { namespace engine {
       on_error();
 
       //================
+    private:
 
       boost::shared_ptr<Stream::Shared>
       MakeShared(const uint64_t& id,

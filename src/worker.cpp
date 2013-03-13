@@ -618,13 +618,14 @@ namespace cocaine { namespace engine {
     
       target->Set(String::NewSymbol("Worker"),worker_constructor->GetFunction());
 
-      onread_sym = NODE_PSYMBOL("onread");
       oncomplete_sym = NODE_PSYMBOL("oncomplete");
       errno_sym = NODE_PSYMBOL("errno");
       buffer_sym = NODE_PSYMBOL("buffer");
       domain_sym = NODE_PSYMBOL("domain");
       bytes_sym = NODE_PSYMBOL("bytes");
       write_queue_size_sym = NODE_PSYMBOL("writeQueueSize");
+      onconnection_sym = NODE_PSYMBOL("onconnection");
+      heartbeat_sym = NODE_PSYMBOL("heartbeat");
       
     }
   }

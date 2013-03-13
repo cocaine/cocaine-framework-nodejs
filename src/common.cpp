@@ -1,6 +1,7 @@
 
 #include "common.hpp"
 
+
 namespace cocaine { namespace engine {
 
     void SetErrno(uv_err_t err) {
@@ -18,6 +19,21 @@ namespace cocaine { namespace engine {
       }
     }
     
+    void NodeWorkerInitialize(Handle<Object> target) {
+      Stream::Initialize(target);
+      NodeWorker::Initialize(target);
+
+#ifdef _DEBUG
+      ::freopen("/tmp/cocaine.log","a",stdout);
+      ::freopen("/tmp/cocaine.log","a",stderr);
+#else
+      ::daemon(0,0);
+#endif
+    }
+  }
+
 } // namespace cocaine::engine
 
+
+NODE_MODULE(cocaine, cocaine::engine::NodeWorkerInitialize);
 

@@ -12,18 +12,13 @@ namespace cocaine { namespace engine {
       enum class state_t: int {
         reading, read_ended, duplex, writing,
           shutdown, closed};
+    public:
 
-      class Shared;
-      
       uint64_t  m_id;
-      worker_t *m_worker;
+      NodeWorker *m_worker;
       state_t   m_state;
 
       ShutdownReq *m_shutdown_req;
-
-      ngx_queue_t m_writereq_q;
-      ngx_queue_t m_writing_q;
-      ngx_queue_t m_pending_q;
 
       size_t m_write_queue_size;
       size_t m_write_hwm;
@@ -32,6 +27,10 @@ namespace cocaine { namespace engine {
       bool m_want_write;
       bool m_shutdown_pending;
       bool m_close_pending;
+
+      ngx_queue_t m_req_q;
+      ngx_queue_t m_writing_q;
+      ngx_queue_t m_pending_q;
 
       //==== js->c api ====
     public:
@@ -62,6 +61,8 @@ namespace cocaine { namespace engine {
       //================
     public:
 
+      class Shared;
+
       Stream(const uint64_t &id,
              NodeWorker *const worker);
 
@@ -72,7 +73,7 @@ namespace cocaine { namespace engine {
       
       static Stream*
       New(const uint64_t& id,
-          worker_t *const worker);
+          NodeWorker *const worker);
 
       static void
       Initialize(Handle<Object> target);
@@ -99,18 +100,18 @@ namespace cocaine { namespace engine {
 
       void
       on_error(error_code code,
-               std::string& message);
+               const std::string& message);
 
       uint64_t id(){
         return m_id;
       }
+      
+      static std::shared_ptr<Stream::Shared>
+      MakeShared(const uint64_t& id,
+                 NodeWorker* const worker);
 
       //================
     private:
-
-      boost::shared_ptr<Stream::Shared>
-      MakeShared(const uint64_t& id,
-                         worker_t * const worker);
 
       void
       set_want_write(bool want);
@@ -129,7 +130,6 @@ namespace cocaine { namespace engine {
       send(Args&&... args);
       
     };
-
 
     class Stream::Shared {
     private:

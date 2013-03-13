@@ -1,28 +1,10 @@
 
-#include <nodejs/node.h>
-#include <nodejs/node_buffer.h>
+#ifndef NOCOCAINE_WORKER_HPP
+#define NOCOCAINE_WORKER_HPP
 
-#include <cocaine/common.hpp>
-#include <cocaine/io.hpp>
-#include <cocaine/rpc.hpp>
-#include <cocaine/unique_id.hpp>
-#include <cocaine/context.hpp>
-#include <cocaine/logging.hpp>
-#include <cocaine/manifest.hpp>
-#include <cocaine/profile.hpp>
 
-#include <cocaine/traits.hpp>
-#include <cocaine/traits/unique_id.hpp>
-#include <cocaine/traits/json.hpp>
-
-#include <boost/filesystem/path.hpp>
-
-using namespace cocaine;
-using namespace cocaine::engine;
-using namespace cocaine::io;
-using namespace cocaine::logging;
-using namespace v8;
-using namespace node;
+#include "common.hpp"
+#include "stream.hpp"
 
 namespace fs = boost::filesystem;
 
@@ -67,8 +49,8 @@ namespace cocaine { namespace engine {
       //std::list<std::shared_ptr<Stream::Shared>> m_writing_q;
       //std::list<std::shared_ptr<Stream::Shared>> m_prepare_q;
       
-      ngx_queue m_writing_q;
-      ngx_queue m_pending_q;
+      ngx_queue_t m_writing_q;
+      ngx_queue_t m_pending_q;
 
       bool m_want_write;
       bool m_want_prepare;
@@ -191,7 +173,7 @@ namespace cocaine { namespace engine {
       void
       stream_remove(Stream *s);      
 
-      template<class Eevnt, typename... Args>
+      template<class Event, typename... Args>
       std::string
       pack_msg(Args&&... args);
     
@@ -205,6 +187,7 @@ namespace cocaine { namespace engine {
     };
     
   }
-} 
+}
 
 
+#endif

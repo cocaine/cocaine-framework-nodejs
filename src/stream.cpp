@@ -280,10 +280,10 @@ namespace cocaine { namespace engine {
 
     //================
 
-    boost::shared_ptr<Stream::Shared>
+    std::shared_ptr<Stream::Shared>
     Stream::MakeShared(const uint64_t& id,
                        worker_t * const worker){
-      return boost::make_shared<Stream::Shared>(
+      return std::make_shared<Stream::Shared>(
         Stream::New(id,worker));
     }
 

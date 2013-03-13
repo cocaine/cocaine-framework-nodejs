@@ -91,7 +91,7 @@ namespace cocaine { namespace engine {
 
     void
     Stream::UpdateWriteQueueSize(){
-      object_->Set(write_queue_size_sym,Integer::New(m_write_queue_size));
+      handle_->Set(write_queue_size_sym,Integer::New(m_write_queue_size));
     }
 
     void

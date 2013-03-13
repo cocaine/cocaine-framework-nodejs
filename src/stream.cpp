@@ -37,6 +37,7 @@ namespace cocaine { namespace engine {
       Local<Object> buf = args[0]->ToObject();
       WriteReq *w = s->make_write_req(buf);
       s->m_write_queue_size += w->length;
+      s->UpdateWriteQueueSize();
       ngx_queue_insert_tail(&(s->m_req_q),
                             &(w->m_req_q));
       s->set_want_write(true);
@@ -88,14 +89,18 @@ namespace cocaine { namespace engine {
 
     //==== js completion helpers ====
 
-    bool
-    Stream::OnWrite(WriteReq *w){
-      bool r=m_worker->send_raw(w->msg); // can throw
-      if(r){
-        w->on_complete();}
-      return r;
+    void
+    Stream::UpdateWriteQueueSize(){
+      object_->Set(write_queue_size_sym,Integer::New(m_write_queue_size));
     }
-      
+
+    void
+    Stream::OnWrite(WriteReq *w){
+      m_write_queue_size -= w->length;
+      UpdateWriteQueueSize();
+      w->on_complete();
+    }
+
     void
     Stream::AfterShutdown(){
       if(m_shutdown_req){
@@ -227,17 +232,18 @@ namespace cocaine { namespace engine {
         WriteReq *w = ngx_queue_data(&m_req_q,
                                      WriteReq,
                                      m_req_q);
-
-        if(!OnWrite(w)){ // can throw
-          return false;
+        bool r=m_worker->send_raw(w->msg); // can throw
+        if(r){
+          ngx_queue_remove(q);
+          OnWrite(w);
+          delete w;
+          if(ngx_queue_empty(&m_req_q)){
+            set_want_write(false);
+          }
         }
-        ngx_queue_remove(q);
-        delete w;
-        
-        if(ngx_queue_empty(&m_req_q)){
-          set_want_write(false);
-        }
-        return true;
+        return r;
+      } else {
+        return false;
       }
     }
 

@@ -47,7 +47,7 @@ namespace cocaine { namespace engine {
 
       //==== js completion helpers ====
     private:
-      bool
+      void
       OnWrite(WriteReq *w);
       
       void
@@ -58,6 +58,9 @@ namespace cocaine { namespace engine {
 
       void
       OnRead(Buffer *b);
+
+      void
+      UpdateWriteQueueSize();
 
       //================
     public:

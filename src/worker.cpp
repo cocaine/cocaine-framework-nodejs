@@ -1,10 +1,7 @@
 
-
 #include "worker.hpp"
 
-
 namespace cocaine { namespace engine {
-    
 
     NodeWorker::NodeWorker(context_t& context,
                worker_config_t config):
@@ -53,7 +50,7 @@ namespace cocaine { namespace engine {
     }
 
     NodeWorker::~NodeWorker(){
-      BOOST_ASSERT(m_state == st::stop);
+      assert(m_state == st::stop);
       delete m_loop;
       delete m_watcher;
       delete m_prepare;
@@ -124,7 +121,7 @@ namespace cocaine { namespace engine {
 
     static void
     NodeWorker::uv_on_check(uv_check_t *hdl, int status){
-      BOOST_ASSERT(status == 0);
+      assert(status == 0);
       NodeWorker *w = (NodeWorker*)hdl->data;
       assert(w->m_check == hdl);
       w->process_prepare();
@@ -132,7 +129,7 @@ namespace cocaine { namespace engine {
 
     static void
     NodeWorker::uv_on_prepare(uv_prepare_t *hdl, int status){
-      BOOST_ASSERT(status == 0);
+      assert(status == 0);
       NodeWorker *w = (NodeWorker*)hdl->data;
       assert(w->m_prepare == hdl);
       w->process_prepare();
@@ -140,7 +137,7 @@ namespace cocaine { namespace engine {
 
     static void
     NodeWorker::uv_on_event(uv_poll_t *hdl,int status, int events){
-      BOOST_ASSERT(status == 0);
+      assert(status == 0);
       NodeWorker *w = (NodeWorker*)hdl->data;
       assert(w->m_watcher == hdl);
       if(events & UV_WRITABLE){
@@ -165,16 +162,19 @@ namespace cocaine { namespace engine {
            && m_shutdown_pending){
           m_shutdown_pending = false;
           on_shutdown();
-          return;
         }
-        if(ngx_queue_empty(&m_prepare_q)){
-          break;}
-        ngx_queue_t *q = ngx_queue_head(&m_prepare_q);
-        Stream *s = ngx_queue_data(q,Stream,m_prepqre_q);
-        assert(s->m_worker == this);
-        ngx_queue_remove(q);
-        ngx_queue_init(q);
-        s->on_prepare();
+        if(st::start < m_state
+           && m_state < st::stop
+           && !ngx_queue_empty(&m_pending_q)){
+          ngx_queue_t *q = ngx_queue_head(&m_pending_q);
+          Stream *s = ngx_queue_data(q,Stream,m_pending_q);
+          assert(s->m_worker == this);
+          ngx_queue_remove(q);
+          ngx_queue_init(q);
+          s->on_prepare();
+        } else {
+          break;
+        }
       }
       set_want_prepare(false);
     }
@@ -182,23 +182,27 @@ namespace cocaine { namespace engine {
     void
     NodeWorker::process_writable(){
       while(true){
-        if(!(st::start < m_state &&
-             m_state < st::stop)){
+        if(!(st::start < m_state
+             && m_state < st::stop)){
           break;}
         if(ngx_queue_empty(&m_writing_q)){
           set_want_write(false);
           break;}
         ngx_queue_t *q = ngx_queue_head(&m_writing_q);
         Stream *s = ngx_queue_data(q,Stream,m_writing_q);
+        bool r;
         try {
-          bool r = s->on_try_write1();}
-        catch (std::exception &e){
-          terminate(abnormal,e.what());
-          break;}
+          r = s->on_try_write1();
+        } catch (std::exception &e){
+          terminate(rpc::suicide::abnormal, e.what());
+          break;
+        }
         if(!r){
-          break;}
-        if(!s->m_want_write){
-          ngx_queue_remove(q);}}}
+          break;
+        }
+        process_prepare();
+      }
+    }
 
     void
     NodeWorker::process_readable() {
@@ -234,7 +238,7 @@ namespace cocaine { namespace engine {
             on_choke(message);
             break;
           case event_traits<rpc::terminate>::id:
-            on_terminate();
+            on_shutdown();
             break;
           default:
             COCAINE_LOG_WARNING(
@@ -244,6 +248,8 @@ namespace cocaine { namespace engine {
               message.id());
             m_channel.drop();
         }
+
+        process_prepare();
       }
     }
 
@@ -251,7 +257,7 @@ namespace cocaine { namespace engine {
 
     static Handle<Value>
     NodeWorker::Listen(const Arguments &args){
-      BOOST_ASSERT(m_state == st::start);
+      assert(m_state == st::start);
       Ref();
       return Integer::New(
         listen());
@@ -267,8 +273,8 @@ namespace cocaine { namespace engine {
         } catch (std::exception &e){
           return ThrowException(
             Exception::Error(
-              String::New(e.what())))
-            }
+              String::New(e.what())));
+        }
       } else {
         return Undefined();
       }
@@ -276,7 +282,7 @@ namespace cocaine { namespace engine {
 
     static Handle<Value>
     NodeWorker::Shutdown(const Arguments &args){
-      BOOST_ASSERT(st::start < m_state);
+      assert(st::start < m_state);
       if(m_state < st::shutdown){
         m_shutdown_pending = true;
         m_state = st::shutdown;
@@ -287,7 +293,7 @@ namespace cocaine { namespace engine {
       
     static Handle<Value>
     NodeWorker::Stop(const Arguments &args){
-      BOOST_ASSERT(st::start < m_state)
+      assert(st::start < m_state)
         if(m_state < st::stop){
           m_stop_pending = true;
           m_state = st::stop;
@@ -332,7 +338,7 @@ namespace cocaine { namespace engine {
       try {
         m_streams.insert(std::make_pair(session_id, stream));
 
-        COCAINE_LOG_ERROR(
+        COCAINE_LOG_DEBUG(
           m_log,
           "worker %s session %x: started session",
           m_id,session_id);
@@ -383,7 +389,7 @@ namespace cocaine { namespace engine {
 
       std::cout << "worker got <end> event" << std::endl;
 
-      COCAINE_LOG_ERROR(
+      COCAINE_LOG_DEBUG(
         m_log,
         "worker %s session %x: received close",
         m_id,session_id);
@@ -400,7 +406,6 @@ namespace cocaine { namespace engine {
             m_id,session_id);
 
           (*(it->second))->on_end();
-          m_streams.erase(it);
               
         } catch(const std::exception& e) {
           (*(it->second))->on_error(invocation_error, e.what());
@@ -420,7 +425,7 @@ namespace cocaine { namespace engine {
           it0 != m_streams.end();
           it0 = it1){
         it1 = it0.next();
-        (*(it0->second))->shutdown();
+        (*(it0->second))->on_shutdown();
       }
     }
 
@@ -434,7 +439,7 @@ namespace cocaine { namespace engine {
           it0 != m_streams.end();
           it0 = it1){
         it1 = it0.next();
-        (*(it0->second))->close();
+        (*(it0->second))->on_stop();
       }
       Unref(); // all base belongs to js
     }
@@ -472,7 +477,7 @@ namespace cocaine { namespace engine {
           m_state = st::stop;
           return 65534;
         }
-        watchers_update_state();
+        update_watchers_state();
         return 0;
       }
       return -1;
@@ -491,7 +496,7 @@ namespace cocaine { namespace engine {
     NodeWorker::set_want_write(bool want){
       if(want && !m_want_write){
         m_want_write = true;
-        watchers_update_state();
+        update_watchers_state();
       } else if(!want && m_want_write) {
         m_want_write = false;
         update_watchers_state();
@@ -502,7 +507,7 @@ namespace cocaine { namespace engine {
     NodeWorker::set_want_prepare(bool want){
       if(want && !m_want_prepare){
         m_want_prepare = true;
-        watchers_update_state();
+        update_watchers_state();
       } else if(!want && m_want_prepare) {
         m_want_prepare = false;
         update_watchers_state();
@@ -578,7 +583,7 @@ namespace cocaine { namespace engine {
         ngx_queue_init(&(s->m_writing_q));
       }
       stream_map_t::iterator it =
-        m_streams.find(s->m_id);
+        m_streams.find(s->id());
       if(it != m_streams.end()){
         m_streams.erase(it);
       }
@@ -606,12 +611,12 @@ namespace cocaine { namespace engine {
       worker_constructor = Persistent<FunctionTemplate>::New(
         FunctionTemplate::New(New));
       worker_constructor->InstanceTemplate()->SetInternalFieldCount(1);
-      NODE_SET_PROTOTYPE_METHOD(worker_constructor_, "listen", Listen);
-      NODE_SET_PROTOTYPE_METHOD(worker_constructor_, "heartbeat", Heartbeat);
-      NODE_SET_PROTOTYPE_METHOD(worker_constructor_, "shutdown", Shutdown);
-      NODE_SET_PROTOTYPE_METHOD(worker_constructor_, "stop", Stop);
+      NODE_SET_PROTOTYPE_METHOD(worker_constructor, "listen", Listen);
+      NODE_SET_PROTOTYPE_METHOD(worker_constructor, "heartbeat", Heartbeat);
+      NODE_SET_PROTOTYPE_METHOD(worker_constructor, "shutdown", Shutdown);
+      NODE_SET_PROTOTYPE_METHOD(worker_constructor, "stop", Stop);
     
-      target->Set(String::NewSymbol("Worker"),w_constructor_->GetFunction());
+      target->Set(String::NewSymbol("Worker"),worker_constructor->GetFunction());
 
       onread_sym = NODE_PSYMBOL("onread");
       oncomplete_sym = NODE_PSYMBOL("oncomplete");
@@ -622,8 +627,7 @@ namespace cocaine { namespace engine {
       write_queue_size_sym = NODE_PSYMBOL("writeQueueSize");
       
     }
-    
   }
-} 
+}
 
 

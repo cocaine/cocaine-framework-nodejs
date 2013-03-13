@@ -5,7 +5,7 @@
 namespace cocaine { namespace engine {
     
     //==== js->c api ====
-      
+
     Handle<Value>
     Stream::WriteBuffer(const Arguments &args){
       switch(m_state){
@@ -268,7 +268,8 @@ namespace cocaine { namespace engine {
     }
 
     void
-    Stream::on_error(){
+    Stream::on_error(error_code code,
+                     std::string& message){
       if(m_state != st::closed){
         m_state = st::closed;
         send<rpc::error>(static_cast<int>(code), message);

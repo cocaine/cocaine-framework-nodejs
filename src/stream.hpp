@@ -60,13 +60,12 @@ namespace cocaine { namespace engine {
       OnRead();
 
       //================
+    public:
 
       Stream(const uint64_t &id,
              NodeWorker *const worker);
 
       ~Stream();
-
-    public:
 
       static Handle<Value>
       New(const Arguments &args);
@@ -99,7 +98,12 @@ namespace cocaine { namespace engine {
       on_end();
 
       void
-      on_error();
+      on_error(error_code code,
+               std::string& message);
+
+      uint64_t id(){
+        return m_id;
+      }
 
       //================
     private:

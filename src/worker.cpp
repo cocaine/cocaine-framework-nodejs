@@ -163,8 +163,8 @@ namespace cocaine { namespace engine {
           m_shutdown_pending = false;
           on_shutdown();
         }
-        if(st::start < m_state
-           && m_state < st::stop
+        if((int)st::start < (int)m_state
+           && (int)m_state < (int)st::stop
            && !ngx_queue_empty(&m_pending_q)){
           ngx_queue_t *q = ngx_queue_head(&m_pending_q);
           Stream *s = ngx_queue_data(q,Stream,m_pending_q);
@@ -182,8 +182,8 @@ namespace cocaine { namespace engine {
     void
     NodeWorker::process_writable(){
       while(true){
-        if(!(st::start < m_state
-             && m_state < st::stop)){
+        if(!((int)st::start < (int)m_state
+             && (int)m_state < (int)st::stop)){
           break;}
         if(ngx_queue_empty(&m_writing_q)){
           set_want_write(false);
@@ -285,8 +285,8 @@ namespace cocaine { namespace engine {
     Handle<Value>
     NodeWorker::Shutdown(const Arguments &args){
       NodeWorker *w=ObjectWrap::Unwrap<NodeWorker>(args.This());
-      assert(st::start < w->m_state);
-      if(w->m_state < st::shutdown){
+      assert((int)st::start < (int)w->m_state);
+      if((int)w->m_state < (int)st::shutdown){
         w->m_shutdown_pending = true;
         w->m_state = st::shutdown;
         w->set_want_prepare(true);
@@ -297,8 +297,8 @@ namespace cocaine { namespace engine {
     Handle<Value>
     NodeWorker::Stop(const Arguments &args){
       NodeWorker *w=ObjectWrap::Unwrap<NodeWorker>(args.This());
-      assert(st::start < w->m_state);
-      if(w->m_state < st::stop){
+      assert((int)st::start < (int)w->m_state);
+      if((int)w->m_state < (int)st::stop){
         w->m_stop_pending = true;
         w->m_state = st::stop;
         w->set_want_prepare(true);
@@ -336,7 +336,7 @@ namespace cocaine { namespace engine {
         "worker %s session %x: received event %s",
         m_id,session_id,event);
 
-      boost::shared_ptr<Stream::Shared> stream(
+      std::shared_ptr<Stream::Shared> stream(
         Stream::MakeShared(session_id,this));
 
       try {
@@ -491,8 +491,8 @@ namespace cocaine { namespace engine {
 
     void
     NodeWorker::terminate(rpc::suicide::reasons reason,
-              const std::string& message){
-      send<rpc::terminate>(reason,message);
+                          const std::string& message){
+      send<rpc::suicide>(static_cast<int>(reason), message);
       m_stop_pending = true;
       m_state = st::stop;
       set_want_prepare(true);

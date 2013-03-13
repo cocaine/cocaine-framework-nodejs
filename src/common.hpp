@@ -30,20 +30,20 @@ using namespace node;
 
 namespace cocaine { namespace engine {
 
-    Persistent<FunctionTemplate> stream_constructor;
-    Persistent<FunctionTemplate> worker_constructor;
+    extern Persistent<FunctionTemplate> stream_constructor;
+    extern Persistent<FunctionTemplate> worker_constructor;
 
-    Persistent<String> onread_sym;
-    Persistent<String> oncomplete_sym;
-    Persistent<String> errno_sym;
-    Persistent<String> buffer_sym;
-    Persistent<String> domain_sym;
-    Persistent<String> process_sym;
-    Persistent<String> bytes_sym;
-    Persistent<String> write_queue_size_sym;
-    Persistent<String> onconnection_sym;
-    Persistent<String> heartbeat_sym;
-    Persistent<String> onheartbeat_sym;
+    extern Persistent<String> onread_sym;
+    extern Persistent<String> oncomplete_sym;
+    extern Persistent<String> errno_sym;
+    extern Persistent<String> buffer_sym;
+    extern Persistent<String> domain_sym;
+    extern Persistent<String> process_sym;
+    extern Persistent<String> bytes_sym;
+    extern Persistent<String> write_queue_size_sym;
+    extern Persistent<String> onconnection_sym;
+    extern Persistent<String> heartbeat_sym;
+    extern Persistent<String> onheartbeat_sym;
 
     void SetErrno(uv_err_t err);
     void NodeWorkerInitialize(Handle<Object> target);

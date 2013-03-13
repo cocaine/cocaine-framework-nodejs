@@ -12,6 +12,7 @@ namespace cocaine { namespace engine {
       enum class state_t: int {
         reading, read_ended, duplex, writing,
           shutdown, closed};
+      typedef state_t st;
     public:
 
       uint64_t  m_id;
@@ -39,15 +40,15 @@ namespace cocaine { namespace engine {
       WriteBuffer(const Arguments &args);
 
       static Handle<Value>
-      Shutdown();
+      Shutdown(const Arguments &args);
 
       static Handle<Value>
-      Close();
+      Close(const Arguments &args);
 
       //==== js completion helpers ====
     private:
-      void
-      AfterWrite(WriteReq *w);
+      bool
+      OnWrite(WriteReq *w);
       
       void
       AfterShutdown();
@@ -56,7 +57,7 @@ namespace cocaine { namespace engine {
       OnClose();
 
       void
-      OnRead();
+      OnRead(Buffer *b);
 
       //================
     public:

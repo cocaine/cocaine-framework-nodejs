@@ -64,6 +64,8 @@ namespace cocaine { namespace engine {
       stream_map_t m_streams;
 
       //================
+      
+    public:
 
       NodeWorker(context_t& context,
                  worker_config_t config);
@@ -142,12 +144,13 @@ namespace cocaine { namespace engine {
 
       //================
 
-      int
-      listen();
-
       void
       terminate(rpc::suicide::reasons reason,
                 const std::string& message);
+
+    private:
+      int
+      listen();
 
       void
       set_want_write(bool want);
@@ -157,6 +160,8 @@ namespace cocaine { namespace engine {
 
       void
       update_watchers_state();
+      
+    public:
 
       void
       writing_enq(Stream *s);

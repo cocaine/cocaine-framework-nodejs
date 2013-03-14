@@ -3,6 +3,8 @@
 
 namespace cocaine { namespace engine {
 
+#define printf(...) printf(__VA_ARGS__); fflush(stdout)
+
     NodeWorker::NodeWorker(context_t& context,
                worker_config_t config):
       m_context(context),
@@ -10,28 +12,40 @@ namespace cocaine { namespace engine {
       m_id(config.uuid),
       m_state(st::start),
       m_channel(context, ZMQ_DEALER, m_id),
-      m_loop(uv_default_loop())
+      m_loop(uv_default_loop()),
+      m_want_write(false),
+      m_want_prepare(false)
     {
       m_endpoint = format(
         "ipc://%1%/engines/%2%",
         m_context.config.path.runtime,
         config.app);
+
+      int z0 = 0;
+
+      m_channel.setsockopt(ZMQ_SNDTIMEO, &z0, sizeof(z0)); //non-blocking, eh?
+      m_channel.setsockopt(ZMQ_RCVTIMEO, &z0, sizeof(z0)); //non-blocking, eh?
       
       m_channel.connect(m_endpoint);
-
-      COCAINE_LOG_INFO(
-        m_log,
-        "%s: evening everybody",
-        m_id);
+      
+      printf(
+        "%s: evening everybody, fd %d\n",
+        m_id.string().c_str(),m_channel.fd());
   
       m_watcher = new uv_poll_t;
       uv_poll_init(m_loop,m_watcher,m_channel.fd());
       m_watcher->data=this;
+      m_watcher_enabled = false;
 
       m_prepare = new uv_prepare_t;
       uv_prepare_init(m_loop,m_prepare);
       m_prepare->data=this;
+      m_prepare_enabled = false;
 
+      m_timer = new uv_timer_t;
+      uv_timer_init(m_loop, m_timer);
+      m_timer->data = this;
+      
       ngx_queue_init(&m_writing_q);
       ngx_queue_init(&m_pending_q);
 
@@ -107,9 +121,8 @@ namespace cocaine { namespace engine {
       }catch(const std::exception &e){
         std::unique_ptr<log_t> log(
           new log_t(*context,"main"));
-        COCAINE_LOG_ERROR(
-          log,
-          "unable to start the worker - %s",
+        printf(
+          "unable to start the worker - %s\n",
           e.what());
         return ThrowException(
           Exception::Error(
@@ -139,7 +152,17 @@ namespace cocaine { namespace engine {
     }
 
     void
+    NodeWorker::uv_on_timer(uv_timer_t *hdl, int status){
+      printf("uv_on_timer\n");
+      assert(status == 0);
+      NodeWorker *w = (NodeWorker*)hdl->data;
+      assert(w->m_timer == hdl);
+      w->uv_on_event(w->m_watcher,0,UV_READABLE);
+    }
+
+    void
     NodeWorker::uv_on_event(uv_poll_t *hdl,int status, int events){
+      printf("uv_on_event\n");
       assert(status == 0);
       NodeWorker *w = (NodeWorker*)hdl->data;
       assert(w->m_watcher == hdl);
@@ -153,6 +176,7 @@ namespace cocaine { namespace engine {
 
     void
     NodeWorker::process_prepare(){
+      printf("process_prepare\n");
       while(true){
         if(m_state == st::stop
            && m_stop_pending){
@@ -169,6 +193,7 @@ namespace cocaine { namespace engine {
         if((int)st::start < (int)m_state
            && (int)m_state < (int)st::stop
            && !ngx_queue_empty(&m_pending_q)){
+          printf("do pending request\n");
           ngx_queue_t *q = ngx_queue_head(&m_pending_q);
           Stream *s = ngx_queue_data(q,Stream,m_pending_q);
           assert(s->m_worker == this);
@@ -184,6 +209,7 @@ namespace cocaine { namespace engine {
 
     void
     NodeWorker::process_writable(){
+      printf("process_writable\n");
       while(true){
         if(!((int)st::start < (int)m_state
              && (int)m_state < (int)st::stop)){
@@ -191,14 +217,21 @@ namespace cocaine { namespace engine {
         if(ngx_queue_empty(&m_writing_q)){
           set_want_write(false);
           break;}
+        printf("gonna write\n");
         ngx_queue_t *q = ngx_queue_head(&m_writing_q);
         Stream *s = ngx_queue_data(q,Stream,m_writing_q);
+        printf("got hdl %x, stream %x\n",q,s);
         bool r;
         try {
           r = s->on_try_write1();
+          printf("after write\n");
         } catch (std::exception &e){
+          printf("after exception\n");
           terminate(rpc::suicide::abnormal, e.what());
           break;
+        } catch (...){
+          printf("unknown exception\n");
+          r = false;
         }
         if(!r){
           break;
@@ -209,22 +242,23 @@ namespace cocaine { namespace engine {
 
     void
     NodeWorker::process_readable() {
+      printf("process_readable\n");
       int counter = defaults::io_bulk_size;
 
       std::string blob;
       io::message_t message;
 
       while(m_state == st::running && counter--) {
-        
+        printf("process_readable iteration\n");
         if(!m_channel.recv(blob)){
+          printf("  no messages\n");
           return;
         }
         message = io::codec::unpack(blob);
 
-        COCAINE_LOG_DEBUG(
-          m_log,
-          "worker %s received type %d message",
-          m_id,
+        printf(
+          "worker %s received type %d message\n",
+          m_id.string().c_str(),
           message.id());
 
         switch(message.id()) {
@@ -244,10 +278,9 @@ namespace cocaine { namespace engine {
             on_shutdown();
             break;
           default:
-            COCAINE_LOG_WARNING(
-              m_log,
-              "worker %s dropping unknown type %d message", 
-              m_id,
+            printf( //warning
+              "worker %s dropping unknown type %d message\n", 
+              m_id.string().c_str(),
               message.id());
             m_channel.drop();
         }
@@ -290,6 +323,7 @@ namespace cocaine { namespace engine {
       NodeWorker *w=ObjectWrap::Unwrap<NodeWorker>(args.This());
       assert((int)st::start < (int)w->m_state);
       if((int)w->m_state < (int)st::shutdown){
+        printf("worker <%p> got shutdown request\n",(void*)w);
         w->m_shutdown_pending = true;
         w->m_state = st::shutdown;
         w->set_want_prepare(true);
@@ -334,10 +368,9 @@ namespace cocaine { namespace engine {
 
       message.as<rpc::invoke>(session_id, event);
 
-      COCAINE_LOG_DEBUG(
-        m_log,
-        "worker %s session %x: received event %s",
-        m_id,session_id,event);
+      printf(
+        "worker %s session %x: received event %s\n",
+        m_id.string().c_str(),session_id,event.c_str());
 
       std::shared_ptr<Stream::Shared> stream(
         Stream::MakeShared(session_id,this));
@@ -345,10 +378,9 @@ namespace cocaine { namespace engine {
       try {
         m_streams.insert(std::make_pair(session_id, stream));
 
-        COCAINE_LOG_DEBUG(
-          m_log,
-          "worker %s session %x: started session",
-          m_id,session_id);
+        printf(
+          "worker %s session %x: started session\n",
+          m_id.string().c_str(),session_id);
 
         OnConnection(&(**stream));
             
@@ -366,10 +398,9 @@ namespace cocaine { namespace engine {
 
       message.as<rpc::chunk>(session_id, chunk);
               
-      COCAINE_LOG_DEBUG(
-        m_log,
-        "worker %s session %x: received chunk length %d",
-        m_id,session_id,chunk.size());
+      printf(
+        "worker %s session %x: received chunk length %d\n",
+        m_id.string().c_str(),session_id,chunk.size());
             
       stream_map_t::iterator it(m_streams.find(session_id));
 
@@ -396,10 +427,9 @@ namespace cocaine { namespace engine {
 
       std::cout << "worker got <end> event" << std::endl;
 
-      COCAINE_LOG_DEBUG(
-        m_log,
-        "worker %s session %x: received close",
-        m_id,session_id);
+      printf(
+        "worker %s session %x: received close\n",
+        m_id.string().c_str(),session_id);
 
       stream_map_t::iterator it = m_streams.find(session_id);
 
@@ -407,10 +437,9 @@ namespace cocaine { namespace engine {
       // will be no active stream, so drop the message.
       if(it != m_streams.end()) {
         try {
-          COCAINE_LOG_DEBUG(
-            m_log,
-            "worker %s session %x: input end",
-            m_id,session_id);
+          printf(
+            "worker %s session %x: input end\n",
+            m_id.string().c_str(),session_id);
 
           (*(it->second))->on_end();
               
@@ -460,6 +489,7 @@ namespace cocaine { namespace engine {
 
     void
     NodeWorker::on_heartbeat(){
+      std::cout << "got heartbeat" << std::endl;
       OnHeartbeat();
     }
 
@@ -467,11 +497,12 @@ namespace cocaine { namespace engine {
 
     int
     NodeWorker::listen(){
+      printf("listen\n");
       if(m_state == st::start){
         int z0=0;
         try{
           //m_channel.connect(m_endpoint);
-          m_channel.setsockopt(ZMQ_SNDTIMEO, &z0, sizeof(z0)); //non-blocking, eh?
+          ;
         } catch (zmq::error_t &e){
           //SetErrno(65535);
           m_state = st::stop;
@@ -481,12 +512,12 @@ namespace cocaine { namespace engine {
           return 65535;
         }
         m_state = st::running;
+        update_watchers_state();
         bool r=send<rpc::heartbeat>();
         if(!r){
           m_state = st::stop;
           return 65534;
         }
-        update_watchers_state();
         return 0;
       }
       return -1;
@@ -527,19 +558,34 @@ namespace cocaine { namespace engine {
     NodeWorker::update_watchers_state(){
       int events = 0;
       if(m_state == state_t::stop){
-        uv_poll_stop(m_watcher);
+        printf("stop poll\n");
+        if(m_watcher_enabled){
+          printf("actually stop\n");
+          uv_timer_stop(m_timer);
+          uv_poll_stop(m_watcher);
+          m_watcher_enabled = false;}
       } else {
         if(m_want_write){
           events |= UV_WRITABLE;}
         if(m_state != state_t::shutdown){
           events |= UV_READABLE;}
+        printf("start poll, events %x\n",events);
         uv_poll_start(m_watcher,events,NodeWorker::uv_on_event);
+        uv_timer_start(m_timer,NodeWorker::uv_on_timer, 0, 100000);
+        m_watcher_enabled = true;
       }
       if(m_want_prepare){
+        printf("start prepare\n");
         uv_prepare_start(m_prepare,NodeWorker::uv_on_prepare);
+        m_prepare_enabled = true;
         //uv_check_start(m_check,NodeWorker::uv_on_chuck);
       }else{
-        uv_prepare_stop(m_prepare);
+        printf("stop prepare\n");
+        if(m_prepare_enabled){
+          printf("actually stop\n");
+          uv_prepare_stop(m_prepare);
+          m_prepare_enabled = false;
+        }
         //uv_check_stop(m_check);
       }
     }
@@ -550,6 +596,9 @@ namespace cocaine { namespace engine {
       ngx_queue_insert_tail(
         &m_writing_q,
         &(s->m_writing_q));
+      printf("writing_enq stream %p, hdl %p\n",&(s->m_writing_q));
+      printf("  or, last: %p\n",ngx_queue_last(&m_writing_q));
+      printf("  and offset is %d\n",offsetof(Stream,m_writing_q));
       set_want_write(true);
     }
 
@@ -598,18 +647,6 @@ namespace cocaine { namespace engine {
       }
     }      
 
-    template<class Event, typename... Args>
-    std::string
-    NodeWorker::pack_msg(Args&&... args) {
-      return io::codec::pack<Event>(std::forward<Args>(args)...);
-    }
-    
-    template<class Event, typename... Args>
-    bool
-    NodeWorker::send(Args&&... args) {
-      return m_channel.send(io::codec::pack<Event>(std::forward<Args>(args)...));
-    }
-
     bool
     NodeWorker::send_raw(std::string &blob, int flags){
       return m_channel.send(blob,flags);
@@ -626,6 +663,12 @@ namespace cocaine { namespace engine {
       NODE_SET_PROTOTYPE_METHOD(worker_constructor, "stop", Stop);
     
       target->Set(String::NewSymbol("Worker"),worker_constructor->GetFunction());
+
+      printf("offset of Stream.m_writing_q: %d\n",
+             (int)__builtin_offsetof(Stream,m_writing_q));
+
+      printf("offset of Stream.m_id: %d\n",
+             (int)__builtin_offsetof(Stream,m_id));
 
       oncomplete_sym = NODE_PSYMBOL("oncomplete");
       errno_sym = NODE_PSYMBOL("errno");

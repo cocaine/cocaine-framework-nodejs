@@ -37,8 +37,6 @@ namespace cocaine { namespace engine {
     }
     
     void NodeWorkerInitialize(Handle<Object> target) {
-      Stream::Initialize(target);
-      NodeWorker::Initialize(target);
 
 #ifdef _DEBUG
       ::freopen("/tmp/cocaine.log","a",stdout);
@@ -46,6 +44,9 @@ namespace cocaine { namespace engine {
 #else
       ::daemon(0,0);
 #endif
+      Stream::Initialize(target);
+      NodeWorker::Initialize(target);
+
     }
   }
 

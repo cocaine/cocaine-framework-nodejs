@@ -39,7 +39,12 @@ namespace cocaine { namespace engine {
       uv_loop_t    *m_loop;
       //uv_check_t   *m_check;
       uv_poll_t    *m_watcher;
+      bool m_watcher_enabled;
+      
       uv_prepare_t *m_prepare;
+      bool m_prepare_enabled;
+
+      uv_timer_t *m_timer;
 
       // The app
 
@@ -81,6 +86,9 @@ namespace cocaine { namespace engine {
 
       static void
       uv_on_check(uv_check_t *hdl, int status);
+
+      static void
+      uv_on_timer(uv_timer_t *hdl, int status);
 
       static void
       uv_on_prepare(uv_prepare_t *hdl, int status);
@@ -191,6 +199,18 @@ namespace cocaine { namespace engine {
 
     };
     
+    template<class Event, typename... Args>
+    std::string
+    NodeWorker::pack_msg(Args&&... args) {
+      return io::codec::pack<Event>(std::forward<Args>(args)...);
+    }
+    
+    template<class Event, typename... Args>
+    bool
+    NodeWorker::send(Args&&... args) {
+      return m_channel.send(io::codec::pack<Event>(std::forward<Args>(args)...));
+    }
+
   }
 }
 

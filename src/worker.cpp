@@ -32,6 +32,9 @@ namespace cocaine { namespace engine {
       uv_prepare_init(m_loop,m_prepare);
       m_prepare->data=this;
 
+      ngx_queue_init(&m_writing_q);
+      ngx_queue_init(&m_pending_q);
+
       // m_check = new uv_check_t;
       // uv_check_init(m_loop,m_check);
       // m_check->data=this;

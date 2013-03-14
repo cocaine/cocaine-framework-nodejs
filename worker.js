@@ -1,14 +1,7 @@
 #!/usr/bin/env node
 
+var coca = require("bindings")("cocaine.node")
 var fs=require("fs")
-
-var Logger=require("./lib/log")
-
-var Server=require("./lib/server")
-
-// lots of arbitrary actions
-
-var L=new Logger("/tmp/cocaine.log")
 
 var argv=process.argv, ai={}
 argv.some(function(a,i){ai[a]=i})
@@ -19,15 +12,19 @@ var options={
   uuid: argv[ai["--uuid"]+1],
   configuration: argv[ai["-c"]+1]}
 
-L.log("worker",options.uuid,"starting",Date())
+console.log("worker",options.uuid,"starting",Date())
 
 var conf=JSON.parse(fs.readFileSync(options.configuration,"utf8"))
 
-//var App=require(conf.paths.spool+"/"+options.app)
-var App=require("./sample/app")
+function run(){
+  var hdl = new coca.Worker(options)
+  hdl.onheartbeat=function(){
+    console.log("got heartbeat",Date())
+  }
+  
+  hdl.listen()
+}
 
-global.__app=App(Server,options).run()
-
-
+run()
 
 

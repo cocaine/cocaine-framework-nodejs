@@ -140,7 +140,7 @@ namespace cocaine { namespace engine {
       m_worker(worker),
       m_state(st::reading)
     {
-      //Empty
+      ngx_queue_init(&m_req_q);
     }
 
     Stream::~Stream(){

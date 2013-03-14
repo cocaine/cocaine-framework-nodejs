@@ -631,7 +631,7 @@ namespace cocaine { namespace engine {
       bytes_sym = NODE_PSYMBOL("bytes");
       write_queue_size_sym = NODE_PSYMBOL("writeQueueSize");
       onconnection_sym = NODE_PSYMBOL("onconnection");
-      process_sym = NODE_PSYMBOL("onconnection");
+      process_sym = NODE_PSYMBOL("process");
       heartbeat_sym = NODE_PSYMBOL("heartbeat");
       onheartbeat_sym = NODE_PSYMBOL("onheartbeat");
       

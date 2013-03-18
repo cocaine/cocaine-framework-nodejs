@@ -12,7 +12,7 @@ var S=new net.Server(
     
     conn.on("end",function(){
       console.log("==== js: stream end")
-      to0=setTimeout(sendChunk,100+100*Math.floor(Math.random()))
+      to0=setTimeout(sendChunk,100+Math.floor(100*Math.random()))
       conn.write(mp.pack({code:200,
                           headers:[
                             ["content-type","text/plain"],

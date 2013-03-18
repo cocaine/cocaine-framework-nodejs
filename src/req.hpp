@@ -16,7 +16,7 @@ namespace cocaine { namespace engine {
       ~Req();
 
       void
-      callback(int status);
+      callback(uv_err_code status);
 
       void
       on_complete();

@@ -36,6 +36,10 @@ namespace cocaine { namespace engine {
       }
       Local<Object> buf = args[0]->ToObject();
       WriteReq *w = s->make_write_req(buf);
+      printf("packed message .data: %p\n",w->msg.c_str());
+      printf(" enq req %p, hdl %p\n",w,&(w->m_req_q));
+      printf(" real offset is %d\n",(int)(((unsigned char*)w)-((unsigned char*)&w->m_req_q)));
+      printf(" offsetof is %d\n",(int)offsetof(WriteReq,m_req_q));
       s->m_write_queue_size += w->length;
       s->UpdateWriteQueueSize();
       ngx_queue_insert_tail(&(s->m_req_q),
@@ -48,6 +52,7 @@ namespace cocaine { namespace engine {
     Stream::Shutdown(const Arguments &args){
       HandleScope scope;
       Stream *s=ObjectWrap::Unwrap<Stream>(args.This());
+      printf("stream <%p> got shutdown request\n",(void*)s);
       switch(s->m_state){
         case st::reading:
         case st::read_ended:
@@ -61,6 +66,8 @@ namespace cocaine { namespace engine {
           // this will cause all future writes to be
           // ignored and m_shutdown_req to be resolved
           // when there's no more pending writes left
+          if(!s->m_want_write){
+            s->m_worker->pending_enq(s);}
           s->m_shutdown_req = s->make_shutdown_req();
           return scope.Close(s->m_shutdown_req->object_);
         case st::shutdown:
@@ -72,6 +79,7 @@ namespace cocaine { namespace engine {
         default:
           ;
       }
+      return Undefined();
     }
 
     Handle<Value>
@@ -99,14 +107,16 @@ namespace cocaine { namespace engine {
       m_write_queue_size -= w->length;
       UpdateWriteQueueSize();
       w->on_complete();
+      
     }
 
     void
     Stream::AfterShutdown(){
       if(m_shutdown_req){
-        m_shutdown_req->on_complete();
-        delete m_shutdown_req;
+        ShutdownReq *r = m_shutdown_req;
         m_shutdown_req = NULL;
+        r->on_complete();
+        delete r;
       }
       m_state = st::closed;
       OnClose();
@@ -115,6 +125,7 @@ namespace cocaine { namespace engine {
 
     void
     Stream::OnClose(){
+      send<rpc::choke>();
       cancel_and_destroy_reqs();
       m_worker->stream_remove(this);
     }
@@ -127,7 +138,9 @@ namespace cocaine { namespace engine {
           Local<Value>::New(b->handle_)};
         MakeCallback(handle_,onread_sym,1,args);
       } else {
-        //XXX SetErrno(UV_EOF);
+        uv_err_t e;
+        e.code=UV_EOF;
+        SetErrno(e);
         MakeCallback(handle_,onread_sym,0,NULL);
       }
     }
@@ -138,13 +151,18 @@ namespace cocaine { namespace engine {
                    NodeWorker *const worker):
       m_id(id),
       m_worker(worker),
-      m_state(st::reading)
+      m_state(st::reading),
+      m_shutdown_req(NULL)
     {
       ngx_queue_init(&m_req_q);
+      ngx_queue_init(&m_writing_q);
+      ngx_queue_init(&m_pending_q);
+      
     }
 
     Stream::~Stream(){
       assert(m_state == st::closed);
+      printf("================ destroyed <stream %p>\n",this);
     }
 
     Handle<Value>
@@ -216,6 +234,7 @@ namespace cocaine { namespace engine {
         OnClose();
       }
       if(m_state == st::shutdown){
+        printf("so, we're shutting down\n");
         if(ngx_queue_empty(&m_req_q)){
           AfterShutdown();
         }
@@ -229,15 +248,22 @@ namespace cocaine { namespace engine {
         assert(m_want_write
                && !(ngx_queue_empty(&m_req_q)));
         ngx_queue_t *q = ngx_queue_head(&m_req_q);
-        WriteReq *w = ngx_queue_data(&m_req_q,
+        WriteReq *w = ngx_queue_data(q,
                                      WriteReq,
                                      m_req_q);
+        printf("got req %p, hdl %p\n",w,q);
+        printf("  offset is like %d\n",(int)((unsigned char*)w-(unsigned char*)q));
+        printf("writing message with .data: %p\n",w->msg.c_str());
+        fflush(stdout);
         bool r=m_worker->send_raw(w->msg); // can throw
+        printf("did write succeed? well, %s.\n",r?"yes":"no");
         if(r){
           ngx_queue_remove(q);
+          ngx_queue_init(q);
           OnWrite(w);
           delete w;
           if(ngx_queue_empty(&m_req_q)){
+            printf("stream <%p> write queue empty\n",(void*)this);
             set_want_write(false);
           }
         }
@@ -326,15 +352,17 @@ namespace cocaine { namespace engine {
       while(!ngx_queue_empty(&m_req_q)){
         q = ngx_queue_head(&m_req_q);
         ngx_queue_remove(q);
+        ngx_queue_init(q);
         WriteReq *w = ngx_queue_data(q,WriteReq,m_req_q);
         assert(w->stream == this);
         w->on_cancel();
         delete w;
       }
       if(m_shutdown_req){
-        m_shutdown_req->on_cancel();
-        delete m_shutdown_req;
+        ShutdownReq *r = m_shutdown_req;
         m_shutdown_req = NULL;
+        r->on_cancel();
+        delete r;
       }
     }
 

@@ -19,6 +19,7 @@ namespace cocaine { namespace engine {
     Persistent<String> write_queue_size_sym;
     Persistent<String> onconnection_sym;
     Persistent<String> heartbeat_sym;
+    Persistent<String> onshutdown_sym;
     Persistent<String> onheartbeat_sym;
 
     void SetErrno(uv_err_t err) {
@@ -37,8 +38,6 @@ namespace cocaine { namespace engine {
     }
     
     void NodeWorkerInitialize(Handle<Object> target) {
-      Stream::Initialize(target);
-      NodeWorker::Initialize(target);
 
 #ifdef _DEBUG
       ::freopen("/tmp/cocaine.log","a",stdout);
@@ -46,6 +45,9 @@ namespace cocaine { namespace engine {
 #else
       ::daemon(0,0);
 #endif
+      Stream::Initialize(target);
+      NodeWorker::Initialize(target);
+
     }
   }
 

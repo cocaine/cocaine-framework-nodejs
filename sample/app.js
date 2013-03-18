@@ -3,6 +3,7 @@ function App(Server,options){
 
   var S=new Server()
   S.bind(options)
+  console.log("bound")
   S.on("request",function (rq,rs){
     console.log("js got request")
     var body=""

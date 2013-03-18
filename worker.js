@@ -2,6 +2,8 @@
 
 var coca = require("bindings")("cocaine.node")
 var fs=require("fs")
+var vm = require("vm")
+var net = require("./lib/net")
 
 var argv=process.argv, ai={}
 argv.some(function(a,i){ai[a]=i})
@@ -16,15 +18,11 @@ console.log("worker",options.uuid,"starting",Date())
 
 var conf=JSON.parse(fs.readFileSync(options.configuration,"utf8"))
 
-function run(){
-  var hdl = new coca.Worker(options)
-  hdl.onheartbeat=function(){
-    console.log("got heartbeat",Date())
-  }
-  
-  hdl.listen()
-}
+process.__cocaine = new coca.Worker(options)
 
-run()
+//var App = require(conf.paths.spool+"/"+options.app)
+var App = require("./sample/net.app")
+
+
 
 

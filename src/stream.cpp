@@ -66,6 +66,8 @@ namespace cocaine { namespace engine {
           // this will cause all future writes to be
           // ignored and m_shutdown_req to be resolved
           // when there's no more pending writes left
+          if(!s->m_want_write){
+            s->m_worker->pending_enq(s);}
           s->m_shutdown_req = s->make_shutdown_req();
           return scope.Close(s->m_shutdown_req->object_);
         case st::shutdown:
@@ -111,9 +113,10 @@ namespace cocaine { namespace engine {
     void
     Stream::AfterShutdown(){
       if(m_shutdown_req){
-        m_shutdown_req->on_complete();
-        delete m_shutdown_req;
+        ShutdownReq *r = m_shutdown_req;
         m_shutdown_req = NULL;
+        r->on_complete();
+        delete r;
       }
       m_state = st::closed;
       OnClose();
@@ -135,7 +138,9 @@ namespace cocaine { namespace engine {
           Local<Value>::New(b->handle_)};
         MakeCallback(handle_,onread_sym,1,args);
       } else {
-        //XXX SetErrno(UV_EOF);
+        uv_err_t e;
+        e.code=UV_EOF;
+        SetErrno(e);
         MakeCallback(handle_,onread_sym,0,NULL);
       }
     }
@@ -146,7 +151,8 @@ namespace cocaine { namespace engine {
                    NodeWorker *const worker):
       m_id(id),
       m_worker(worker),
-      m_state(st::reading)
+      m_state(st::reading),
+      m_shutdown_req(NULL)
     {
       ngx_queue_init(&m_req_q);
       ngx_queue_init(&m_writing_q);
@@ -156,6 +162,7 @@ namespace cocaine { namespace engine {
 
     Stream::~Stream(){
       assert(m_state == st::closed);
+      printf("================ destroyed <stream %p>\n",this);
     }
 
     Handle<Value>
@@ -252,6 +259,7 @@ namespace cocaine { namespace engine {
         printf("did write succeed? well, %s.\n",r?"yes":"no");
         if(r){
           ngx_queue_remove(q);
+          ngx_queue_init(q);
           OnWrite(w);
           delete w;
           if(ngx_queue_empty(&m_req_q)){
@@ -344,15 +352,17 @@ namespace cocaine { namespace engine {
       while(!ngx_queue_empty(&m_req_q)){
         q = ngx_queue_head(&m_req_q);
         ngx_queue_remove(q);
+        ngx_queue_init(q);
         WriteReq *w = ngx_queue_data(q,WriteReq,m_req_q);
         assert(w->stream == this);
         w->on_cancel();
         delete w;
       }
       if(m_shutdown_req){
-        m_shutdown_req->on_cancel();
-        delete m_shutdown_req;
+        ShutdownReq *r = m_shutdown_req;
         m_shutdown_req = NULL;
+        r->on_cancel();
+        delete r;
       }
     }
 

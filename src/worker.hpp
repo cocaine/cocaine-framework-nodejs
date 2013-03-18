@@ -37,7 +37,7 @@ namespace cocaine { namespace engine {
       io::socket_t m_channel;
         
       uv_loop_t    *m_loop;
-      //uv_check_t   *m_check;
+      uv_check_t   *m_check;
       uv_poll_t    *m_watcher;
       bool m_watcher_enabled;
       
@@ -127,6 +127,9 @@ namespace cocaine { namespace engine {
 
       void
       OnHeartbeat();
+
+      void
+      OnShutdown();
 
       //==== loop callbacks
 

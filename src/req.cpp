@@ -27,18 +27,21 @@ namespace cocaine { namespace engine {
     }
 
     void
-    Req::callback(int status){
+    Req::callback(uv_err_code status){
       HandleScope scope;
       Local<Value> argv[] = {
-        Integer::New(status),
+        Integer::New((int)status),
         Local<Value>::New(stream->handle_),
         Local<Value>::New(object_)};
+      uv_err_t e;
+      e.code=status;
+      SetErrno(e);
       MakeCallback(object_,oncomplete_sym,3,argv);
     }
     
     void
     Req::on_complete(){
-      callback(0);
+      callback(UV_OK);
     }
       
     void

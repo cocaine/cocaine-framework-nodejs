@@ -44,6 +44,7 @@ namespace cocaine { namespace engine {
     extern Persistent<String> onconnection_sym;
     extern Persistent<String> heartbeat_sym;
     extern Persistent<String> onheartbeat_sym;
+    extern Persistent<String> onshutdown_sym;
 
     void SetErrno(uv_err_t err);
     void NodeWorkerInitialize(Handle<Object> target);

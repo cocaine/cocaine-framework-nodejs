@@ -19,6 +19,7 @@ namespace cocaine { namespace engine {
     Persistent<String> write_queue_size_sym;
     Persistent<String> onconnection_sym;
     Persistent<String> heartbeat_sym;
+    Persistent<String> onshutdown_sym;
     Persistent<String> onheartbeat_sym;
 
     void SetErrno(uv_err_t err) {

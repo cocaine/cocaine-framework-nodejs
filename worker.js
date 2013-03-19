@@ -4,6 +4,7 @@ var coca = require("bindings")("cocaine.node")
 var fs=require("fs")
 var vm = require("vm")
 var net = require("./lib/net")
+var http = require("./lib/http")
 
 var argv=process.argv, ai={}
 argv.some(function(a,i){ai[a]=i})

@@ -6,8 +6,8 @@ var S=new http.Server(function(rq,rs){
     console.log("==== js: got chunk on connection",chunk.length)
   })
   rq.on("end",function(){
-    rs.writeHead(200,{content-type:"text/plain",
-                      x-by:"space-monkeys"})
+    rs.writeHead(200,{"content-type":"text/plain",
+                      "x-by":"space-monkeys"})
     rs.end("hugechunkofdata\n")
   })
 })

@@ -12,21 +12,12 @@ var S=new net.Server(
     
     conn.on("end",function(){
       console.log("==== js: stream end")
-      to0=setTimeout(sendChunk,100+Math.floor(100*Math.random()))
       conn.write(mp.pack({code:200,
                           headers:[
                             ["content-type","text/plain"],
                             ["x-by","space-monkeys"]]}))
+      conn.end("aosdijfoasidjfoasidfojaisdf\n")
     })
-    
-    function sendChunk(){
-      if(i0<10){
-        conn.write("hugechunkofdata\n")
-        i0++
-        to0=setTimeout(sendChunk,100+Math.floor(100*Math.random()))}
-      else{
-        conn.end()}
-    }
     
   })
 

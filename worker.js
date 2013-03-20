@@ -22,7 +22,8 @@ var conf=JSON.parse(fs.readFileSync(options.configuration,"utf8"))
 process.__cocaine = new coca.Worker(options)
 
 //var App = require(conf.paths.spool+"/"+options.app)
-var App = require("./sample/http.app")
+console.log("starging app")
+var App = require("./sample/express.app")
 
 
 

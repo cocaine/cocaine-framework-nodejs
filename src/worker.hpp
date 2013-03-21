@@ -120,6 +120,15 @@ namespace cocaine { namespace engine {
       static Handle<Value>
       Stop(const Arguments &args);
 
+      static Handle<Value>
+      LogDebug(const Arguments &args);
+      static Handle<Value>
+      LogInfo(const Arguments &args);
+      static Handle<Value>
+      LogWarning(const Arguments &args);
+      static Handle<Value>
+      LogError(const Arguments &args);
+
       //==== js completion helpers
 
       void

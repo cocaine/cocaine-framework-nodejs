@@ -358,6 +358,51 @@ namespace cocaine { namespace engine {
       return Undefined();
     }
 
+    Handle<Value>
+    NodeWorker::LogDebug(const Arguments &args){
+      NodeWorker *w=ObjectWrap::Unwrap<NodeWorker>(args.This());
+      assert((int)st::start < (int)w->m_state);
+      if((int)w->m_state < (int)st::stop){
+        v8::String::Utf8Value val(args[0]->ToString());
+        std::string message = std::string(*val);
+        COCAINE_LOG_DEBUG(w->m_log,message);
+      }
+      return Undefined();
+    }
+    Handle<Value>
+    NodeWorker::LogInfo(const Arguments &args){
+      NodeWorker *w=ObjectWrap::Unwrap<NodeWorker>(args.This());
+      assert((int)st::start < (int)w->m_state);
+      if((int)w->m_state < (int)st::stop){
+        v8::String::Utf8Value val(args[0]->ToString());
+        std::string message = std::string(*val);
+        COCAINE_LOG_INFO(w->m_log,message);
+      }
+      return Undefined();
+    }
+    Handle<Value>
+    NodeWorker::LogWarning(const Arguments &args){
+      NodeWorker *w=ObjectWrap::Unwrap<NodeWorker>(args.This());
+      assert((int)st::start < (int)w->m_state);
+      if((int)w->m_state < (int)st::stop){
+        v8::String::Utf8Value val(args[0]->ToString());
+        std::string message = std::string(*val);
+        COCAINE_LOG_WARNING(w->m_log,message);
+      }
+      return Undefined();
+    }
+    Handle<Value>
+    NodeWorker::LogError(const Arguments &args){
+      NodeWorker *w=ObjectWrap::Unwrap<NodeWorker>(args.This());
+      assert((int)st::start < (int)w->m_state);
+      if((int)w->m_state < (int)st::stop){
+        v8::String::Utf8Value val(args[0]->ToString());
+        std::string message = std::string(*val);
+        COCAINE_LOG_ERROR(w->m_log,message);
+      }
+      return Undefined();
+    }
+
     //==== js completion helpers
 
     void
@@ -700,6 +745,10 @@ namespace cocaine { namespace engine {
       NODE_SET_PROTOTYPE_METHOD(worker_constructor, "heartbeat", Heartbeat);
       NODE_SET_PROTOTYPE_METHOD(worker_constructor, "shutdown", Shutdown);
       NODE_SET_PROTOTYPE_METHOD(worker_constructor, "stop", Stop);
+      NODE_SET_PROTOTYPE_METHOD(worker_constructor, "log_debug", LogDebug);
+      NODE_SET_PROTOTYPE_METHOD(worker_constructor, "log_info", LogInfo);
+      NODE_SET_PROTOTYPE_METHOD(worker_constructor, "log_warning", LogWarning);
+      NODE_SET_PROTOTYPE_METHOD(worker_constructor, "log_error", LogError);
     
       target->Set(String::NewSymbol("Worker"),worker_constructor->GetFunction());
 

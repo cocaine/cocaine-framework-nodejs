@@ -6,7 +6,7 @@ var app = module.exports = express()
 
 app.use(express.bodyParser())
 
-app.get('/', function(req, res){
+app.get('/node/main', function(req, res){
   res.send('<form method="post" enctype="multipart/form-data">'
            + '<p>Title: <input type="text" name="title" /></p>'
            + '<p>Image: <input type="file" name="image" /></p>'
@@ -14,7 +14,7 @@ app.get('/', function(req, res){
            + '</form>');
 });
 
-app.post('/', function(req, res, next){
+app.post('/node/main', function(req, res, next){
   // the uploaded file can be found as `req.files.image` and the
   // title field as `req.body.title`
   res.send(format('\nuploaded %s (%d Kb) to %s as %s'
@@ -25,9 +25,9 @@ app.post('/', function(req, res, next){
 });
 
 
-app.listen({handle:process.__cocaine})
+var S=app.listen({handle:process.__cocaine})
 console.log("express started")
-setTimeout(function(){app.close()},200000)
+setTimeout(function(){S.close()},200000)
 
 
 

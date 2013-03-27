@@ -1,17 +1,17 @@
 {
   "name": "no-cocaine",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "node.js worker for Cocaine platform",
   "author": "Dmitry Unkovsky <diunko@yandex-team.ru>",
   "homepage": "https://github.com/diunko/no-cocaine",
   "repository": "git://github.com/diunko/no-cocaine.git",
-  "main": "./index",
   "engines": {
     "node": ">= 0.8.x"
   },
   "scripts": {
     "test": "node test.js"
   },
+  "main":"./index",
   "dependencies": {
     "msgpack": ">=0.1.7",
     "bindings": ">=1.0.0"

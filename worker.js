@@ -27,5 +27,3 @@ var App = require(conf.paths.spool+"/"+options.app)
 //var App = require("./sample/express.app")
 
 
-
-

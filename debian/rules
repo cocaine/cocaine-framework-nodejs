@@ -1,0 +1,19 @@
+#!/usr/bin/make -f
+
+NPM=npm
+TMP_PREFIX=debian/tmp
+WORKER_PREFIX=debian/cocaine-worker-nodejs/usr/lib/cocaine-worker-nodejs
+
+%:
+	dh $@
+
+override_dh_auto_install:
+	mkdir -p $(TMP_PREFIX)
+	$(NPM) install --production --global --prefix=$(TMP_PREFIX) .
+	mv $(TMP_PREFIX)/lib/node_modules/cocaine-worker/* $(WORKER_PREFIX)/
+	rm -rf $(TMP_PREFIX)
+
+override_dh_auto_clean:
+	node-gyp clean
+	rm -rf node_modules/
+

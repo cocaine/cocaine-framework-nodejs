@@ -2,7 +2,7 @@
 
 NPM=npm
 TMP_PREFIX=debian/tmp
-WORKER_PREFIX=debian/cocaine-worker-nodejs/usr/lib/cocaine-worker-nodejs
+WORKER_PREFIX=debian/cocaine-framework-nodejs/usr/lib/cocaine-framework-nodejs
 
 %:
 	dh $@
@@ -10,7 +10,7 @@ WORKER_PREFIX=debian/cocaine-worker-nodejs/usr/lib/cocaine-worker-nodejs
 override_dh_auto_install:
 	mkdir -p $(TMP_PREFIX)
 	$(NPM) install --production --global --prefix=$(TMP_PREFIX) .
-	mv $(TMP_PREFIX)/lib/node_modules/cocaine-worker/* $(WORKER_PREFIX)/
+	mv $(TMP_PREFIX)/lib/node_modules/cocaine-framework/* $(WORKER_PREFIX)/
 	rm -rf $(TMP_PREFIX)
 
 override_dh_auto_clean:

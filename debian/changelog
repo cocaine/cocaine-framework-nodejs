@@ -1,10 +1,10 @@
-cocaine-worker-nodejs (0.1.0-1) unstable; urgency=low
+cocaine-framework-nodejs (0.1.0-1) unstable; urgency=low
 
   * Emulate nodejs .net and .http api.
 
  -- diunko <diunko@yandex-team.ru>  Wed, 27 Mar 2013 10:21:40 +0200
 
-cocaine-worker-nodejs (0.0.1-1) lucid; urgency=low
+cocaine-framework-nodejs (0.0.1-1) lucid; urgency=low
 
   * Initial release.
 

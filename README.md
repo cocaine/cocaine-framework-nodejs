@@ -1,3 +1,3 @@
 
-#### nodejs worker for cocaine platform
+#### nodejs framework for cocaine platform
 

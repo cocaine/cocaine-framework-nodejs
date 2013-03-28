@@ -222,12 +222,9 @@ namespace cocaine { namespace engine {
     
     void NodeWorkerInitialize(Handle<Object> target) {
 
-#ifdef _DEBUG
       ::freopen("/tmp/cocaine.log","a",stdout);
       ::freopen("/tmp/cocaine.log","a",stderr);
-#else
-      ::daemon(0,0);
-#endif
+
       Stream::Initialize(target);
       NodeWorker::Initialize(target);
 

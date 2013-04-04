@@ -5,8 +5,6 @@
 
 
 #include <v8.h>
-#include <node.h>
-#include <node_buffer.h>
 #include <msgpack.h>
 #include <math.h>
 #include <vector>

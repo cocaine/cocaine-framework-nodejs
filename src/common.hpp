@@ -2,8 +2,8 @@
 #ifndef NOCOCAINE_COMMON_HPP
 #define NOCOCAINE_COMMON_HPP
 
-#include <nodejs/node.h>
-#include <nodejs/node_buffer.h>
+#include <node.h>
+#include <node_buffer.h>
 
 #include <cocaine/common.hpp>
 #include <cocaine/io.hpp>

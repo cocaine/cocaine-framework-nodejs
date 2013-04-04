@@ -1,5 +1,5 @@
 {
-  "name": "cocaine-framework",
+  "name": "cocaine-framework-nodejs",
   "version": "0.1.0",
   "description": "Node.js framework for Cocaine platform",
   "author": "Dmitry Unkovsky <diunko@yandex-team.ru>",

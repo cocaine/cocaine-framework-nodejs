@@ -1,0 +1,18 @@
+{
+  "name": "cocaine-framework-nodejs",
+  "version": "0.1.0",
+  "description": "Node.js framework for Cocaine platform",
+  "author": "Oleg Kutkov <olegkutkov@yandex-team.ru>",
+  "homepage": "https://github.com/cocaine/cocaine-framework-nodejs",
+  "repository": "git://github.com/cocaine/cocaine-framework-nodejs.git",
+  "engines": {
+    "node": "0.8.x"
+  },
+  "dependencies": {
+    "msgpack": ">=0.1.7",
+    "bindings": ">=1.0.0"
+  },
+  "devDependencies": {
+  }
+}
+

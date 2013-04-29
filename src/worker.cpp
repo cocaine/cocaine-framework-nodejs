@@ -48,11 +48,11 @@ Handle<Value> node_worker::New(const v8::Arguments& args) {
 	HandleScope scope;
 
 	if (args.Length() != 2) {
-		return ThrowException(Exception::TypeError(String::New("three arguments is required (endpoint, uuid)")));
+		return ThrowException(Exception::TypeError(String::New("two arguments is required (endpoint, uuid)")));
 	}
 
 	if (!args[0]->IsString()) {
-		return ThrowException(Exception::TypeError(String::New("frist argument should be a string (endpoint)")));
+		return ThrowException(Exception::TypeError(String::New("first argument should be a string (endpoint)")));
 	}
 
 	if (!args[1]->IsString()) {

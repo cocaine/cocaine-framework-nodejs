@@ -18,8 +18,8 @@
     along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef NODEJS_IO_REACTOR_HPP
-#define NODEJS_IO_REACTOR_HPP
+#ifndef NODEJS_APP_LOOP_HPP
+#define NODEJS_APP_LOOP_HPP
 
 #include <cocaine/common.hpp>
 #include <uv.h>

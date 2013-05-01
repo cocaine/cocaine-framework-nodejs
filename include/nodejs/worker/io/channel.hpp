@@ -22,24 +22,42 @@
 #define NODEJS_COCAINE_IO_CHANNEL_HPP
 
 #include <cocaine/rpc/decoder.hpp>
-#include <cocaine/rpc/encoder.hpp>
 #include "readable_stream.hpp"
 #include "writable_stream.hpp"
+#include "nodejs/worker/io/channel_interface.hpp"
+#include "nodejs/worker/error_handler.hpp"
 
 namespace worker { namespace io {
 
 template<class Socket>
-class channel {
+class channel
+	: public channel_interface {
+
 public:
 	channel(app_loop& loop, const std::shared_ptr<Socket>& socket)
 		: rd(new cocaine::io::decoder<readable_stream<Socket>>())
-		, wr(new cocaine::io::encoder<writable_stream<Socket>>()) {
+		, wr(new writable_stream<Socket>(loop, socket)) {
+
 		rd->attach(std::make_shared<readable_stream<Socket>>(loop, socket));
-		wr->attach(std::make_shared<writable_stream<Socket>>(loop, socket));
+		wr->bind(error_handler());
 	}
 
+	void bind_reader_cb(rd_func func) {
+		rd->bind(func, error_handler());
+	}
+
+	void close() {
+		rd->unbind();
+		wr->unbind();
+	}
+
+	void write(const char* data, const size_t size) {
+		wr->write(data, size);
+	}
+
+private:
 	std::unique_ptr<cocaine::io::decoder<readable_stream<Socket>>> rd;
-	std::unique_ptr<cocaine::io::encoder<writable_stream<Socket>>> wr;
+	std::unique_ptr<writable_stream<Socket>> wr;
 };
 
 }}

@@ -3,9 +3,7 @@
     {
       'target_name': 'nodejs_cocaine_framework',
       'sources': [ 'src/node_addon.cpp',
-                   'src/worker.cpp',
-                   'src/service_resolver.cpp',
-                   'src/service_storage.cpp'
+                   'src/worker.cpp'
       ],
       'CXX': '/usr/bin/clang',
       'libraries': [ '-lboost_program_options-mt',

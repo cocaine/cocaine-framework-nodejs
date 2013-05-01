@@ -22,29 +22,35 @@
 #define NODEJS_COCAINE_WORKER_HPP
 
 #include <node.h>
-#include <boost/utility.hpp>
-#include "nodejs/worker/io/cocaine_communicator.hpp"
-#include "nodejs/worker/uv_timer.hpp"
+#include <cocaine/asio/local.hpp>
+#include <cocaine/asio/tcp.hpp>
+#include <cocaine/asio/socket.hpp>
+#include "nodejs/worker/app_loop.hpp"
+#include "nodejs/worker/io/channel.hpp"
 
 namespace worker {
 
 class node_worker 
-	: private boost::noncopyable
-	, public node::ObjectWrap {
+	: public node::ObjectWrap {
+
+	COCAINE_DECLARE_NONCOPYABLE(node_worker)
+
 public:
 	static void Initialize(v8::Handle<v8::Object>& exports);
 
-	node_worker(const std::string& endpoint, const std::string& uuid);
+	node_worker(const std::string& endpoint);
+	node_worker(const std::string& host, const uint16_t port);
+	~node_worker();
 
 	static v8::Handle<v8::Value> send(const v8::Arguments& args);
+	static v8::Handle<v8::Value> close(const v8::Arguments& args);
 
 private:
 	static v8::Handle<v8::Value> New(const v8::Arguments& args);
 
-	void on_heartbeat_timer(int status);
-	void on_disown_timer(int status);
-
 	void install_handlers();
+
+	void on_message(const cocaine::io::message_t& message);
 
 	void on_heartbeat();
 	void on_invoke(const uint64_t sid, const std::string& event);
@@ -53,12 +59,10 @@ private:
 	void on_error(const uint64_t sid, const int code, const std::string& msg);
 	void on_terminate();
 
-	std::string app_id;
 	worker::io::app_loop io_loop;
-	std::unique_ptr<worker::uv_timer> heartbeat_timer;
-	std::unique_ptr<worker::uv_timer> disown_timer;
-	std::unique_ptr<io::cocaine_communicator<cocaine::io::local>> worker_comm;
+	std::unique_ptr<worker::io::channel_interface> channel;
 
+	static v8::Persistent<v8::String> on_heartbeat_cb;
 	static v8::Persistent<v8::String> on_invoke_cb;
 	static v8::Persistent<v8::String> on_chunk_cb;
 	static v8::Persistent<v8::String> on_choke_cb;

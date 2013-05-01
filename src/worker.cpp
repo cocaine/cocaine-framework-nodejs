@@ -18,12 +18,13 @@
     along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <node_buffer.h>
 #include "nodejs/worker/worker.hpp"
-#include <iostream>
 
 using namespace worker;
 using namespace v8;
 
+Persistent<String> node_worker::on_heartbeat_cb;
 Persistent<String> node_worker::on_invoke_cb;
 Persistent<String> node_worker::on_chunk_cb;
 Persistent<String> node_worker::on_choke_cb;
@@ -34,9 +35,11 @@ void node_worker::Initialize(v8::Handle<v8::Object>& exports) {
 	Handle<FunctionTemplate> tpl = FunctionTemplate::New(New);
 	tpl->InstanceTemplate()->SetInternalFieldCount(1);
 
-	NODE_SET_PROTOTYPE_METHOD(tpl, "Send", node_worker::send);
-	exports->Set(String::NewSymbol("Worker"), tpl->GetFunction());
+	NODE_SET_PROTOTYPE_METHOD(tpl, "send", node_worker::send);
+	NODE_SET_PROTOTYPE_METHOD(tpl, "close", node_worker::close);
+	exports->Set(String::NewSymbol("communicator"), tpl->GetFunction());
 
+	on_heartbeat_cb = NODE_PSYMBOL("on_heartbeat");
 	on_invoke_cb = NODE_PSYMBOL("on_invoke");
 	on_chunk_cb = NODE_PSYMBOL("on_chunk");
 	on_choke_cb = NODE_PSYMBOL("on_choke");
@@ -47,117 +50,162 @@ void node_worker::Initialize(v8::Handle<v8::Object>& exports) {
 Handle<Value> node_worker::New(const v8::Arguments& args) {
 	HandleScope scope;
 
-	if (args.Length() != 2) {
-		return ThrowException(Exception::TypeError(String::New("three arguments is required (endpoint, uuid)")));
+	if (args.Length() == 1) {
+		if (!args[0]->IsString()) {
+			return ThrowException(Exception::TypeError(String::New("argument should be a string (endpoint)")));
+		}
+
+		std::string endpoint = *(String::AsciiValue(args[0]));
+
+		node_worker* worker_instance;
+
+		try {
+			worker_instance = new node_worker(endpoint);
+		} catch (const std::exception& e) {
+			return ThrowException(Exception::TypeError(String::New(e.what())));
+		}
+
+		worker_instance->Wrap(args.This());
+		return args.This();
+	}
+	else if (args.Length() == 2) {
+		if (!args[0]->IsString()) {
+			return ThrowException(Exception::TypeError(String::New("first argument must be a string (host)")));
+		}
+
+		if (!args[1]->IsNumber()) {
+			return ThrowException(Exception::TypeError(String::New("second argument must be an integer (port)")));
+		}
+
+		std::string host = *(String::AsciiValue(args[0]));
+		uint16_t port = static_cast<uint16_t>(args[1]->Uint32Value());
+
+		node_worker* worker_instance;
+
+		try {
+			worker_instance = new node_worker(host, port);
+		} catch (const std::exception& e) {
+			return ThrowException(Exception::TypeError(String::New(e.what())));
+		}
+
+		worker_instance->Wrap(args.This());
+		return args.This();
 	}
 
-	if (!args[0]->IsString()) {
-		return ThrowException(Exception::TypeError(String::New("frist argument should be a string (endpoint)")));
-	}
-
-	if (!args[1]->IsString()) {
-		return ThrowException(Exception::TypeError(String::New("second argument should be a string (uuid)")));
-	}
-
-	std::string endpoint = *(String::AsciiValue(args[0]));
-	std::string uuid = *(String::AsciiValue(args[1]));
-
-	node_worker* worker_instance;
-
-	try {
-		worker_instance = new node_worker(endpoint, uuid);
-	} catch (const std::exception& e) {
-		return ThrowException(Exception::TypeError(String::New("unable to create Worker")));
-	}
-
-	worker_instance->Wrap(args.This());
-
-	return args.This();
+	return ThrowException(Exception::TypeError(String::New("invalid arguments (set endpoint or host:port)")));
 }
 
-node_worker::node_worker(const std::string& endpoint, const std::string& uuid)
-	: app_id (uuid) {
+node_worker::node_worker(const std::string& endpoint)
+{
+	typedef cocaine::io::local endpoint_t;
 
-	heartbeat_timer.reset(new worker::uv_timer(io_loop));
-	disown_timer.reset(new worker::uv_timer(io_loop));
-
-	worker_comm.reset(new io::cocaine_communicator<cocaine::io::local>(io_loop, endpoint));
-	
+	auto socket = std::make_shared<cocaine::io::socket<endpoint_t>>(endpoint_t::endpoint(endpoint));
+	channel.reset(new worker::io::channel<cocaine::io::socket<endpoint_t>>(io_loop, socket));
 	install_handlers();
-
-	worker_comm->handshake(uuid);
-
-	heartbeat_timer->set(std::bind(&node_worker::on_heartbeat_timer, this, std::placeholders::_1));
-
-	heartbeat_timer->start(0u, 5u);
-
-	disown_timer->set(std::bind(&node_worker::on_disown_timer, this, std::placeholders::_1));
-
-	disown_timer->start(2u, 2u);
 }
 
-void node_worker::on_heartbeat_timer(int status) {
-	worker_comm->heartbeat();
-	disown_timer->start(2u, 2u);
+node_worker::node_worker(const std::string& host, const uint16_t port)
+{
+	typedef cocaine::io::tcp endpoint_t;
+
+	auto socket = std::make_shared<cocaine::io::socket<endpoint_t>>(endpoint_t::endpoint(host, port));
+	channel.reset(new worker::io::channel<cocaine::io::socket<endpoint_t>>(io_loop, socket));
+	install_handlers();
 }
 
-void node_worker::on_disown_timer(int status) {
-	heartbeat_timer->stop();
-	on_error(0, 42, "worker has lost the controlling engine");
+node_worker::~node_worker() {
+	channel->close();
 }
 
 void node_worker::install_handlers() {
-	worker_comm->on_heartbeat(std::bind(&node_worker::on_heartbeat, this));
+	channel->bind_reader_cb(std::bind(&node_worker::on_message, this, std::placeholders::_1));
+}
 
-	worker_comm->on_invoke(std::bind(&node_worker::on_invoke
-						, this, std::placeholders::_1
-						, std::placeholders::_2) );
+void node_worker::on_message(const cocaine::io::message_t& message)
+{
+	switch(message.id()) {
+		case cocaine::io::event_traits<cocaine::io::rpc::heartbeat>::id: {
+			on_heartbeat();
+			break;
+		}
 
-	worker_comm->on_chunk(std::bind(&node_worker::on_chunk
-						, this
-						, std::placeholders::_1
-						, std::placeholders::_2) );
+		case cocaine::io::event_traits<cocaine::io::rpc::invoke>::id: {
+			std::string event;
+			message.as<cocaine::io::rpc::invoke>(event);
+			on_invoke(message.band(), event);
+			break;
+		}
 
-	worker_comm->on_choke(std::bind(&node_worker::on_choke
-						, this
-						, std::placeholders::_1) );
+		case cocaine::io::event_traits<cocaine::io::rpc::chunk>::id: {
+			std::string chunk;
+			message.as<cocaine::io::rpc::chunk>(chunk);
+			on_chunk(message.band(), chunk);
+			break;
+		}
 
-	worker_comm->on_error(std::bind(&node_worker::on_error
-						, this
-						, std::placeholders::_1
-						, std::placeholders::_2
-						, std::placeholders::_3));
+		case cocaine::io::event_traits<cocaine::io::rpc::choke>::id: {
+			on_choke(message.band());
+			break;
+		}
 
-	worker_comm->on_terminate(std::bind(&node_worker::on_terminate, this));
+		case cocaine::io::event_traits<cocaine::io::rpc::error>::id: {
+			cocaine::error_code ec;
+			std::string error_message;
+			message.as<cocaine::io::rpc::error>(ec, error_message);
+			on_error(message.band(), ec, error_message);
+			break;
+		}
+
+		case cocaine::io::event_traits<cocaine::io::rpc::terminate>::id: {
+			on_terminate();
+		}
+
+		default: {
+			on_error(message.band(), 42, "unknown message");
+			break;
+		}
+	}
 }
 
 Handle<Value> node_worker::send(const Arguments& args) {
 	HandleScope scope;
 
-	if (args.Length() != 2) {
-		return ThrowException(Exception::TypeError(String::New("two arguments is required (sid, data)")));
+	if (args.Length() != 1 || !node::Buffer::HasInstance(args[0])) {
+		return ThrowException(Exception::TypeError(String::New("one argument should be a buffer")));
 	}
 
-	if (!args[0]->IsNumber()) {
-		return ThrowException(Exception::TypeError(String::New("first argument must be an integer (sid)")));
-	}
+	Local<Object> buf = args[0]->ToObject();
 
-	if (!args[1]->IsString()) {
-		return ThrowException(Exception::TypeError(String::New("seconf argument must be a string (data)")));
-	}
-
-	uint32_t sid = args[0]->Uint32Value();
-	std::string data = *(String::AsciiValue(args[1]));
+	char* data = node::Buffer::Data(buf);
+	size_t size = node::Buffer::Length(buf);
 
 	node_worker* obj = ObjectWrap::Unwrap<node_worker>(args.This());
 
-	obj->worker_comm->send<cocaine::io::rpc::chunk>(sid, data);
+	try {
+		obj->channel->write(data, size);
+	} catch (const std::exception& e) {
+		return ThrowException(Exception::TypeError(String::New(e.what())));
+	}
 
 	return scope.Close(args[0]);
 }
 
+Handle<Value> node_worker::close(const Arguments& args)
+{
+	HandleScope scope;
+	node_worker* obj = ObjectWrap::Unwrap<node_worker>(args.This());
+
+	try {
+		obj->channel->close();
+	} catch (const std::exception& e) {
+		return ThrowException(Exception::TypeError(String::New(e.what())));
+	}
+
+	return Undefined();
+}
+
 void node_worker::on_heartbeat() {
-	disown_timer->stop();
+	node::MakeCallback(handle_, on_heartbeat_cb, 0, NULL);
 }
 
 void node_worker::on_invoke(const uint64_t sid, const std::string& event) {

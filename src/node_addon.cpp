@@ -19,14 +19,10 @@
 */
 
 #include "nodejs/worker/worker.hpp"
-#include "nodejs/worker/service_resolver.hpp"
-#include "nodejs/worker/service_storage.hpp"
 
 using namespace v8;
 
 void InitModule(Handle<Object> exports) {
-	worker::services::service_resolver::Initialize(exports);
-	worker::services::service_storage::Initialize(exports);
 	worker::node_worker::Initialize(exports);
 }
 

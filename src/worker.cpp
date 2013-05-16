@@ -157,7 +157,10 @@ void node_worker::on_message(const cocaine::io::message_t& message)
 		}
 
 		case cocaine::io::event_traits<cocaine::io::rpc::terminate>::id: {
-			on_terminate();
+			cocaine::io::rpc::terminate::code code;
+			std::string reason;
+			message.as<cocaine::io::rpc::terminate>(code, reason);
+			on_terminate(message.band(), code, reason);
 		}
 
 		default: {
@@ -244,7 +247,13 @@ void node_worker::on_error(const uint64_t sid, const int code, const std::string
 	node::MakeCallback(handle_, on_error_cb, 3, argv);
 }
 
-void node_worker::on_terminate() {
-	node::MakeCallback(handle_, on_terminate_cb, 0, NULL);
+void node_worker::on_terminate(const uint64_t sid, const int code, const std::string& reason) {
+	Local<Value> argv[3] = {
+		Integer::New(static_cast<uint32_t>(sid))
+		, Integer::New(code)
+		, String::New(reason.c_str())
+	};
+
+	node::MakeCallback(handle_, on_terminate_cb, 3, argv);
 }
 

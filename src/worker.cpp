@@ -377,7 +377,7 @@ namespace worker {
              && val->type == MSGPACK_OBJECT_RAW){
             const char *k = key->via.raw.ptr;
             if(k[0]=='b'&&k[1]=='o'&&k[2]=='d'&&k[3]=='y'){
-              Buffer *b = Buffer::New(const_cast<char*>(val->via.raw.ptr),
+              node::Buffer *b = node::Buffer::New(const_cast<char*>(val->via.raw.ptr),
                                       val->via.raw.size);
               o->Set(String::New("body"),
                      Local<Object>::New(b->handle_));
@@ -403,7 +403,7 @@ namespace worker {
 
     HandleScope scope;
 
-    if (args.Length() < 0 || !Buffer::HasInstance(args[0])) {
+    if (args.Length() < 0 || !node::Buffer::HasInstance(args[0])) {
       return ThrowException(Exception::TypeError(
                               String::New("First argument must be a Buffer")));
     }
@@ -414,14 +414,14 @@ namespace worker {
     msgpack_object mo;
     size_t off = 0;
 
-    switch (msgpack_unpack(Buffer::Data(buf), Buffer::Length(buf), &off, &mz._mz, &mo)) {
+    switch (msgpack_unpack(node::Buffer::Data(buf), node::Buffer::Length(buf), &off, &mz._mz, &mo)) {
       case MSGPACK_UNPACK_EXTRA_BYTES:
       case MSGPACK_UNPACK_SUCCESS:
         try {
-          msgpack_unpack_template->GetFunction()->Set(
-            msgpack_bytes_remaining_symbol,
-            Integer::New(static_cast<int32_t>(Buffer::Length(buf) - off))
-            );
+          // msgpack_unpack_template->GetFunction()->Set(
+          //   msgpack_bytes_remaining_symbol,
+          //   Integer::New(static_cast<int32_t>(Buffer::Length(buf) - off))
+          //   );
           return scope.Close(msgpack_http_request_to_v8(&mo));
         } catch (MsgpackException e) {
           return ThrowException(e.getThrownException());

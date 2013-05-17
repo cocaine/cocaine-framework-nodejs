@@ -13,13 +13,13 @@ var W,S,L
 Q.all([Storage.resolve(),
        Logger.resolve()])
   .done(function(){
-    console.log("services have to be resolved")
     S = new Storage()
     L = new Logger(argv.app)
     
     var W = new co.Worker(argv)
     W.on("hash",function(stream){
-      console.log("got http event")
+      //console.log("got http event")
+      L.error("==== got http event")
       var meta
       var body = []
       var length = 0
@@ -41,9 +41,11 @@ Q.all([Storage.resolve(),
         stream.write("that's who I am\n")
         var m = S.read("manifests",argv.app)
         m.on("data",function(data){
-          console.log("data",data.length,data)
+          //console.log("data",data.length,data)
+          L.debug("data "+data.length+" "+data)
           var manifests = mp.unpack(data.slice(3))
-          console.log("manifests",manifests)
+          //console.log("manifests",manifests)
+          L.debug("manifests" + manifests)
           stream.write(JSON.stringify(manifests,null,2))
         })
         m.on("end",function(){

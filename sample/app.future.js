@@ -4,7 +4,7 @@ var argv = require("optimist").argv
 var mp = require("msgpack")
 
 var Storage = co.Service("storage")
-var Logger = co.Service("logger")
+var Logger = co.Service("logging")
 
 var W = new co.Worker(argv)
 

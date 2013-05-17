@@ -227,9 +227,10 @@ void node_worker::on_invoke(const uint64_t sid, const std::string& event) {
 }
 
 void node_worker::on_chunk(const uint64_t sid, const std::string& data) {
+  node::Buffer *b = node::Buffer::New(const_cast<char*>(data.c_str()),data.size());
 	Local<Value> argv[2] = {
 		Integer::New(static_cast<uint32_t>(sid))
-		, String::New(data.c_str())
+    , Local<Value>::New(b->handle_)
 	};
 
 	node::MakeCallback(handle_, on_chunk_cb, 2, argv);

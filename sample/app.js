@@ -42,7 +42,7 @@ Q.all([Storage.resolve(),
         var m = S.read("manifests",argv.app)
         m.on("data",function(data){
           console.log("data",data.length,data)
-          var manifests = mp.unpack(data)
+          var manifests = mp.unpack(data.slice(3))
           console.log("manifests",manifests)
           stream.write(JSON.stringify(manifests,null,2))
         })

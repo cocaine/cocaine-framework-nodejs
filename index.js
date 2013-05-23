@@ -1,10 +1,8 @@
 
-var Service = require("./lib/service").Service
-var Worker = require("./lib/worker").Worker
+var _ = require("./lib/service")
+exports.Service = _.Service
+exports.getServices = _.getServices
 
-module.exports = {
-  Service:Service,
-  Worker:Worker
-}
+exports.Worker = require("./lib/worker").Worker
 
 

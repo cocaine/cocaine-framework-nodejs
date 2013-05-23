@@ -19,25 +19,19 @@ Q.all([Storage.resolve(),
     var W = new co.Worker(argv)
     W.on("hash",function(stream){
       //console.log("got http event")
-      L.error("==== got http event")
-      var meta
-      var body = []
-      var length = 0
+      L.debug("==== got http event")
+      var request
       stream.on("data",function(data){
-        if(!meta){
-          meta = mp.unpack(data)
-        } else {
-          body.push(data)
-          length += data.length
-        }
+        __assert(request === undefined)
+        request = W._unpackHttpRequest(data)
       })
       
       stream.on("end",function(){
-        // stream.write(
-        //   mp.pack({code:200,
-        //            headers:[
-        //              ["content-type","text/plain"],
-        //              ["x-by","worker"+argv.uuid]]}))
+        stream.write(
+          mp.pack({code:200,
+                   headers:[
+                     ["content-type","text/plain"],
+                     ["x-by","worker"+argv.uuid]]}))
         stream.write("that's who I am\n")
         var m = S.read("manifests",argv.app)
         m.on("data",function(data){

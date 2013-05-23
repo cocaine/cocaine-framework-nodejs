@@ -1,9 +1,8 @@
 
+var _ = require("./lib/service")
+exports.Service = _.Service
+exports.getServices = _.getServices
 
-module.exports={
-  net:require("./lib/net"),
-  http:require("./lib/http")
-}
-
+exports.Worker = require("./lib/worker").Worker
 
 

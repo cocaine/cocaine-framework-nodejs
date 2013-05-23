@@ -1,777 +1,439 @@
+/*
+    Copyright (c) 2013-2013 Oleg Kutkov <olegkutkov@yandex-team.ru>
+    Copyright (c) 2013-2013 Other contributors as noted in the AUTHORS file.
 
-#include "worker.hpp"
+    This file is part of Cocaine.
 
-namespace cocaine { namespace engine {
+    Cocaine is free software; you can redistribute it and/or modify
+    it under the terms of the GNU Lesser General Public License as published by
+    the Free Software Foundation; either version 3 of the License, or
+    (at your option) any later version.
 
-#define printf(...) printf(__VA_ARGS__); fflush(stdout)
+    Cocaine is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+    GNU Lesser General Public License for more details.
 
-    NodeWorker::NodeWorker(context_t& context,
-               worker_config_t config):
-      m_context(context),
-      m_log(new log_t(context, format("app/%s", config.app))),
-      m_id(config.uuid),
-      m_state(st::start),
-      m_shutdown_pending(false),
-      m_shutdown_done(false),
-      m_stop_pending(false),
-      m_stop_done(false),
-      m_channel(context, ZMQ_DEALER, m_id),
-      m_loop(uv_default_loop()),
-      m_want_write(false),
-      m_want_prepare(false)
-    {
-      m_endpoint = format(
-        "ipc://%1%/engines/%2%",
-        m_context.config.path.runtime,
-        config.app);
+    You should have received a copy of the GNU Lesser General Public License
+    along with this program. If not, see <http://www.gnu.org/licenses/>.
+*/
 
-      int z0 = 0;
+#include <node_buffer.h>
+#include "nodejs/worker/worker.hpp"
 
-      // non-blocking:
-      m_channel.setsockopt(ZMQ_SNDTIMEO, &z0, sizeof(z0));
-      m_channel.setsockopt(ZMQ_RCVTIMEO, &z0, sizeof(z0));
-      
-      m_channel.connect(m_endpoint);
-      
-      printf("%s: evening everybody, fd %d\n",
-             m_id.string().c_str(),m_channel.fd());
-  
-      m_watcher = new uv_poll_t;
-      uv_poll_init(m_loop,m_watcher,m_channel.fd());
-      m_watcher->data=this;
-      m_watcher_enabled = false;
+using namespace worker;
+using namespace v8;
 
-      m_prepare = new uv_prepare_t;
-      uv_prepare_init(m_loop,m_prepare);
-      m_prepare->data=this;
-      m_prepare_enabled = false;
+Persistent<String> node_worker::on_heartbeat_cb;
+Persistent<String> node_worker::on_invoke_cb;
+Persistent<String> node_worker::on_chunk_cb;
+Persistent<String> node_worker::on_choke_cb;
+Persistent<String> node_worker::on_error_cb;
+Persistent<String> node_worker::on_terminate_cb;
 
-      m_timer = new uv_timer_t;
-      uv_timer_init(m_loop, m_timer);
-      m_timer->data = this;
-      
-      ngx_queue_init(&m_writing_q);
-      ngx_queue_init(&m_pending_q);
+namespace worker {
+  static Handle<Value>
+  unpack_http_request(const Arguments &args);  
+}
 
-      m_check = new uv_check_t;
-      uv_check_init(m_loop,m_check);
-      m_check->data=this;
+void node_worker::Initialize(v8::Handle<v8::Object>& exports) {
+	Handle<FunctionTemplate> tpl = FunctionTemplate::New(New);
+	tpl->InstanceTemplate()->SetInternalFieldCount(1);
 
-      try {
-        m_manifest.reset(new manifest_t(m_context, config.app));
-        m_profile.reset(new profile_t(m_context, config.profile));
-      } catch(const std::exception& e) {
-        terminate(rpc::suicide::abnormal, e.what());
-        throw;
-      } catch(...) {
-        terminate(rpc::suicide::abnormal, "unexpected exception");
-        throw;
-      }
-    
+	NODE_SET_PROTOTYPE_METHOD(tpl, "send", node_worker::send);
+	NODE_SET_PROTOTYPE_METHOD(tpl, "close", node_worker::close);
+	NODE_SET_PROTOTYPE_METHOD(tpl, "unpackHttpRequest", unpack_http_request);
+	exports->Set(String::NewSymbol("communicator"), tpl->GetFunction());
+
+	on_heartbeat_cb = NODE_PSYMBOL("on_heartbeat");
+	on_invoke_cb = NODE_PSYMBOL("on_invoke");
+	on_chunk_cb = NODE_PSYMBOL("on_chunk");
+	on_choke_cb = NODE_PSYMBOL("on_choke");
+	on_error_cb = NODE_PSYMBOL("on_error");
+	on_terminate_cb = NODE_PSYMBOL("on_terminate");
+}
+
+Handle<Value> node_worker::New(const v8::Arguments& args) {
+	HandleScope scope;
+
+	if (args.Length() == 1) {
+		if (!args[0]->IsString()) {
+			return ThrowException(Exception::TypeError(String::New("argument should be a string (endpoint)")));
+		}
+
+		std::string endpoint = *(String::AsciiValue(args[0]));
+
+		node_worker* worker_instance;
+
+		try {
+			worker_instance = new node_worker(endpoint);
+		} catch (const std::exception& e) {
+			return ThrowException(Exception::TypeError(String::New(e.what())));
+		}
+
+		worker_instance->Wrap(args.This());
+		return args.This();
+	}
+	else if (args.Length() == 2) {
+		if (!args[0]->IsString()) {
+			return ThrowException(Exception::TypeError(String::New("first argument must be a string (host)")));
+		}
+
+		if (!args[1]->IsNumber()) {
+			return ThrowException(Exception::TypeError(String::New("second argument must be an integer (port)")));
+		}
+
+		std::string host = *(String::AsciiValue(args[0]));
+		uint16_t port = static_cast<uint16_t>(args[1]->Uint32Value());
+
+		node_worker* worker_instance;
+
+		try {
+			worker_instance = new node_worker(host, port);
+		} catch (const std::exception& e) {
+			return ThrowException(Exception::TypeError(String::New(e.what())));
+		}
+
+		worker_instance->Wrap(args.This());
+		return args.This();
+	}
+
+	return ThrowException(Exception::TypeError(String::New("invalid arguments (set endpoint or host:port)")));
+}
+
+node_worker::node_worker(const std::string& endpoint)
+{
+	typedef cocaine::io::local endpoint_t;
+
+	auto socket = std::make_shared<cocaine::io::socket<endpoint_t>>(endpoint_t::endpoint(endpoint));
+	channel.reset(new worker::io::channel<cocaine::io::socket<endpoint_t>>(io_loop, socket));
+	install_handlers();
+}
+
+node_worker::node_worker(const std::string& host, const uint16_t port)
+{
+	typedef cocaine::io::tcp endpoint_t;
+
+	auto socket = std::make_shared<cocaine::io::socket<endpoint_t>>(endpoint_t::endpoint(host, port));
+	channel.reset(new worker::io::channel<cocaine::io::socket<endpoint_t>>(io_loop, socket));
+	install_handlers();
+}
+
+node_worker::~node_worker() {
+	channel->close();
+}
+
+void node_worker::install_handlers() {
+	channel->bind_reader_cb(std::bind(&node_worker::on_message, this, std::placeholders::_1));
+}
+
+void node_worker::on_message(const cocaine::io::message_t& message)
+{
+	switch(message.id()) {
+		case cocaine::io::event_traits<cocaine::io::rpc::heartbeat>::id: {
+			on_heartbeat();
+			break;
+		}
+
+		case cocaine::io::event_traits<cocaine::io::rpc::invoke>::id: {
+			std::string event;
+			message.as<cocaine::io::rpc::invoke>(event);
+			on_invoke(message.band(), event);
+			break;
+		}
+
+		case cocaine::io::event_traits<cocaine::io::rpc::chunk>::id: {
+			std::string chunk;
+			message.as<cocaine::io::rpc::chunk>(chunk);
+			on_chunk(message.band(), chunk);
+			break;
+		}
+
+		case cocaine::io::event_traits<cocaine::io::rpc::choke>::id: {
+			on_choke(message.band());
+			break;
+		}
+
+		case cocaine::io::event_traits<cocaine::io::rpc::error>::id: {
+			cocaine::error_code ec;
+			std::string error_message;
+			message.as<cocaine::io::rpc::error>(ec, error_message);
+			on_error(message.band(), ec, error_message);
+			break;
+		}
+
+		case cocaine::io::event_traits<cocaine::io::rpc::terminate>::id: {
+			cocaine::io::rpc::terminate::code code;
+			std::string reason;
+			message.as<cocaine::io::rpc::terminate>(code, reason);
+			on_terminate(message.band(), code, reason);
+		}
+
+		default: {
+			on_error(message.band(), 42, "unknown message");
+			break;
+		}
+	}
+}
+
+Handle<Value> node_worker::send(const Arguments& args) {
+	HandleScope scope;
+
+	if (args.Length() != 1 || !node::Buffer::HasInstance(args[0])) {
+		return ThrowException(Exception::TypeError(String::New("one argument should be a buffer")));
+	}
+
+	Local<Object> buf = args[0]->ToObject();
+
+	char* data = node::Buffer::Data(buf);
+	size_t size = node::Buffer::Length(buf);
+
+	node_worker* obj = ObjectWrap::Unwrap<node_worker>(args.This());
+
+	try {
+		obj->channel->write(data, size);
+	} catch (const std::exception& e) {
+		return ThrowException(Exception::TypeError(String::New(e.what())));
+	}
+
+	return scope.Close(args[0]);
+}
+
+Handle<Value> node_worker::close(const Arguments& args)
+{
+	HandleScope scope;
+	node_worker* obj = ObjectWrap::Unwrap<node_worker>(args.This());
+
+	try {
+		obj->channel->close();
+	} catch (const std::exception& e) {
+		return ThrowException(Exception::TypeError(String::New(e.what())));
+	}
+
+	return Undefined();
+}
+
+void node_worker::on_heartbeat() {
+	node::MakeCallback(handle_, on_heartbeat_cb, 0, NULL);
+}
+
+void node_worker::on_invoke(const uint64_t sid, const std::string& event) {
+	Local<Value> argv[2] = {
+		Integer::New(static_cast<uint32_t>(sid))
+		, String::New(event.c_str())
+	};
+
+	node::MakeCallback(handle_, on_invoke_cb, 2, argv);
+}
+
+void node_worker::on_chunk(const uint64_t sid, const std::string& data) {
+  node::Buffer *b = node::Buffer::New(const_cast<char*>(data.c_str()),data.size());
+	Local<Value> argv[2] = {
+		Integer::New(static_cast<uint32_t>(sid))
+    , Local<Value>::New(b->handle_)
+	};
+
+	node::MakeCallback(handle_, on_chunk_cb, 2, argv);
+}
+
+void node_worker::on_choke(const uint64_t sid) {
+	Local<Value> argv[1] = {
+		Integer::New(static_cast<uint32_t>(sid))
+	};
+
+	node::MakeCallback(handle_, on_choke_cb, 1, argv);
+}
+
+void node_worker::on_error(const uint64_t sid, const int code, const std::string& msg) {
+	Local<Value> argv[3] = {
+		Integer::New(static_cast<uint32_t>(sid))
+		, Integer::New(code)
+		, String::New(msg.c_str())
+	};
+
+	node::MakeCallback(handle_, on_error_cb, 3, argv);
+}
+
+void node_worker::on_terminate(const uint64_t sid, const int code, const std::string& reason) {
+	Local<Value> argv[3] = {
+		Integer::New(static_cast<uint32_t>(sid))
+		, Integer::New(code)
+		, String::New(reason.c_str())
+	};
+
+	node::MakeCallback(handle_, on_terminate_cb, 3, argv);
+}
+
+
+namespace worker {
+
+  class MsgpackException {
+  public:
+    MsgpackException(const char *str) :
+      msg(String::New(str)) {
     }
 
-    NodeWorker::~NodeWorker(){
-      assert(m_state == st::stop);
-      printf("==== <worker %p> is stopped\n",this);
-      delete m_watcher;
-      delete m_prepare;
+    Handle<Value> getThrownException() {
+      return Exception::TypeError(msg);
     }
 
-    Handle<Value> // it's ok
-    NodeWorker::New(const Arguments &args) {
-      if(!args.IsConstructCall()){
-        return ThrowException(
-          Exception::Error(
-            String::New("Worker: not a construct call")));}
-      if(!(args.Length() == 1 &&
-           args[0]->IsObject())){
-        return ThrowException(
-          Exception::TypeError(
-            String::New("new Worker(<options>): options should be an Object")));
-      }
+  private:
+    const Handle<String> msg;
+  };
 
-      HandleScope scope;
+  class MsgpackZone {
+  public:
+    msgpack_zone _mz;
 
-      Local<Object> opts = Local<Object>::New(args[0]->ToObject());
-  
-#define _SYM NODE_PSYMBOL
-      String::Utf8Value
-        app(opts->Get(_SYM("app"))),
-        uuid(opts->Get(_SYM("uuid"))),
-        profile(opts->Get(_SYM("profile"))),
-        configuration(opts->Get(_SYM("configuration")));
-#undef _SYM
-
-      worker_config_t *config = new worker_config_t();
-      config->app          = *app;
-      config->uuid         = *uuid;
-      config->profile      = *profile;
-      std::string config_path     = *configuration;
-
-      context_t *context; 
-      try{
-        context = new context_t(config_path,
-                                "slave");
-      } catch(const std::exception &e){
-        return ThrowException(
-          Exception::Error(
-            String::New("unable to initialize context")));
-      }
-
-      NodeWorker *worker;
-      try{
-        worker = new NodeWorker(*context,
-                                *config);
-      }catch(const std::exception &e){
-        std::unique_ptr<log_t> log(
-          new log_t(*context,"main"));
-        printf(
-          "unable to start the worker - %s\n",
-          e.what());
-        return ThrowException(
-          Exception::Error(
-            String::New("unsble to start the worker")));
-      }
-
-      worker->Wrap(args.This());
-      return args.This();
+    MsgpackZone(size_t sz = 1024) {
+      msgpack_zone_init(&this->_mz, sz);
     }
 
+    ~MsgpackZone() {
+      msgpack_zone_destroy(&this->_mz);
+    }
+  };
 
+  class MsgpackSbuffer {
+  public:
+    msgpack_sbuffer _sbuf;
 
-    void
-    NodeWorker::uv_on_check(uv_check_t *hdl, int status){
-      assert(status == 0);
-      NodeWorker *w = (NodeWorker*)hdl->data;
-      assert(w->m_check == hdl);
-      printf(">>>>>> uv_on_check\n");
-      w->process_prepare();
-      printf("<<<<<< uv_on_check\n");
+    MsgpackSbuffer() {
+      msgpack_sbuffer_init(&this->_sbuf);
     }
 
-    void
-    NodeWorker::uv_on_prepare(uv_prepare_t *hdl, int status){
-      assert(status == 0);
-      NodeWorker *w = (NodeWorker*)hdl->data;
-      assert(w->m_prepare == hdl);
-      printf(">>>>>> uv_on_prepare\n");
-      w->process_prepare();
-      printf("<<<< uv_on_prepare\n");
+    ~MsgpackSbuffer() {
+      msgpack_sbuffer_destroy(&this->_sbuf);
     }
+  };
 
-    void
-    NodeWorker::uv_on_timer(uv_timer_t *hdl, int status){
-      printf(">>>> uv_on_timer =========\n");
-      assert(status == 0);
-      NodeWorker *w = (NodeWorker*)hdl->data;
-      assert(w->m_timer == hdl);
-      w->uv_on_event(w->m_watcher,0,UV_READABLE);
-      printf("<<<< uv_on_timer =========\n");
-    }
+// Convert a MessagePack object to a V8 object.
+//
+// This method is recursive. It will probably blow out the stack on objects
+// with extremely deep nesting.
+  static Handle<Value>
+  msgpack_to_v8(msgpack_object *mo) {
+    switch (mo->type) {
+      case MSGPACK_OBJECT_NIL:
+        return Null();
 
-    void
-    NodeWorker::uv_on_event(uv_poll_t *hdl,int status, int events){
-      printf(">>>> uv_on_event =========\n");
-      assert(status == 0);
-      NodeWorker *w = (NodeWorker*)hdl->data;
-      assert(w->m_watcher == hdl);
-      if(events & UV_WRITABLE){
-        w->process_writable();
-      }
-      if(events & UV_READABLE){
-        w->process_readable();
-      }
-      printf("<<<< uv_on_event =========\n");
-    }
+      case MSGPACK_OBJECT_BOOLEAN:
+        return (mo->via.boolean) ?
+          True() :
+          False();
 
-    void
-    NodeWorker::process_prepare(){
-      printf("process_prepare\n");
-      while(true){
-        if(m_state == st::stop
-           && m_stop_pending){
-          m_stop_pending = false;
-          printf("<worker %p> got stop request from queue, stopping\n",this);
-          set_want_prepare(false);
-          on_stop();
-          return;
+      case MSGPACK_OBJECT_POSITIVE_INTEGER:
+        return Integer::NewFromUnsigned(static_cast<uint32_t>(mo->via.u64));
+
+      case MSGPACK_OBJECT_NEGATIVE_INTEGER:
+        return Integer::New(static_cast<int32_t>(mo->via.i64));
+
+      case MSGPACK_OBJECT_DOUBLE:
+        return Number::New(mo->via.dec);
+
+      case MSGPACK_OBJECT_ARRAY: {
+        Local<Array> a = Array::New(mo->via.array.size);
+
+        for (uint32_t i = 0; i < mo->via.array.size; i++) {
+          a->Set(i, msgpack_to_v8(&mo->via.array.ptr[i]));
         }
-        if(m_state == st::shutdown
-           && m_shutdown_pending){
-          m_shutdown_pending = false;
-          printf("<worker %p> got shutdown request from queue, shutting down\n",this);
-          on_shutdown();
-        }
-        if((int)st::start < (int)m_state
-           && (int)m_state < (int)st::stop
-           && !ngx_queue_empty(&m_pending_q)){
-          printf("do pending request\n");
-          ngx_queue_t *q = ngx_queue_head(&m_pending_q);
-          Stream *s = ngx_queue_data(q,Stream,m_pending_q);
-          assert(s->m_worker == this);
-          ngx_queue_remove(q);
-          ngx_queue_init(q);
-          s->on_prepare();
-        } else {
-          break;
-        }
+
+        return a;
       }
-      set_want_prepare(false);
+
+      case MSGPACK_OBJECT_RAW:
+        return String::New(mo->via.raw.ptr, mo->via.raw.size);
+
+      case MSGPACK_OBJECT_MAP: {
+        Local<Object> o = Object::New();
+
+        for (uint32_t i = 0; i < mo->via.map.size; i++) {
+          o->Set(
+            msgpack_to_v8(&mo->via.map.ptr[i].key),
+            msgpack_to_v8(&mo->via.map.ptr[i].val)
+            );
+        }
+
+        return o;
+      }
+
+      default:
+        throw MsgpackException("Encountered unknown MesssagePack object type");
+    }
+  }
+
+  static Handle<Value>
+  msgpack_http_request_to_v8(msgpack_object *mo) {
+    switch (mo->type) {
+
+      case MSGPACK_OBJECT_MAP: {
+        Local<Object> o = Object::New();
+
+        for (uint32_t i = 0; i < mo->via.map.size; i++) {
+          msgpack_object *key = &mo->via.map.ptr[i].key;
+          msgpack_object *val = &mo->via.map.ptr[i].val;
+          if(key->type == MSGPACK_OBJECT_RAW
+             && key->via.raw.size == 4
+             && val->type == MSGPACK_OBJECT_RAW){
+            const char *k = key->via.raw.ptr;
+            if(k[0]=='b'&&k[1]=='o'&&k[2]=='d'&&k[3]=='y'){
+              node::Buffer *b = node::Buffer::New(const_cast<char*>(val->via.raw.ptr),
+                                      val->via.raw.size);
+              o->Set(String::New("body"),
+                     Local<Object>::New(b->handle_));
+              continue;}}
+          o->Set(
+            msgpack_to_v8(&mo->via.map.ptr[i].key),
+            msgpack_to_v8(&mo->via.map.ptr[i].val));
+        }
+
+        return o;
+      }
+
+      default:
+        throw MsgpackException("http request is not a map");
+    }
+  }
+
+
+  static Handle<Value>
+  unpack_http_request(const Arguments &args) {
+    static Persistent<String> msgpack_bytes_remaining_symbol =
+      NODE_PSYMBOL("bytes_remaining");
+
+    HandleScope scope;
+
+    if (args.Length() < 0 || !node::Buffer::HasInstance(args[0])) {
+      return ThrowException(Exception::TypeError(
+                              String::New("First argument must be a Buffer")));
     }
 
-    void
-    NodeWorker::process_writable(){
-      printf("process_writable\n");
-      while(true){
-        if(!((int)st::start < (int)m_state
-             && (int)m_state < (int)st::stop)){
-          break;}
-        if(ngx_queue_empty(&m_writing_q)){
-          set_want_write(false);
-          break;}
-        printf("gonna write\n");
-        ngx_queue_t *q = ngx_queue_head(&m_writing_q);
-        Stream *s = ngx_queue_data(q,Stream,m_writing_q);
-        printf("got hdl %p, stream %p\n",q,s);
-        bool r;
+    Local<Object> buf = args[0]->ToObject();
+
+    MsgpackZone mz;
+    msgpack_object mo;
+    size_t off = 0;
+
+    switch (msgpack_unpack(node::Buffer::Data(buf), node::Buffer::Length(buf), &off, &mz._mz, &mo)) {
+      case MSGPACK_UNPACK_EXTRA_BYTES:
+      case MSGPACK_UNPACK_SUCCESS:
         try {
-          r = s->on_try_write1();
-          printf("after write\n");
-        } catch (std::exception &e){
-          printf("after exception\n");
-          terminate(rpc::suicide::abnormal, e.what());
-          break;
-        } catch (...){
-          printf("unknown exception\n");
-          r = false;
-        }
-        if(!r){
-          break;
-        }
-        process_prepare();
-      }
-    }
-
-    void
-    NodeWorker::process_readable() {
-      printf("process_readable\n");
-      int counter = defaults::io_bulk_size;
-
-      std::string blob;
-      io::message_t message;
-
-      while(m_state == st::running && counter--) {
-        printf("process_readable iteration\n");
-        if(!m_channel.recv(blob)){
-          printf("  no messages\n");
-          return;
-        }
-        message = io::codec::unpack(blob);
-
-        printf(
-          "worker %s received type %d message\n",
-          m_id.string().c_str(),
-          message.id());
-
-        switch(message.id()) {
-          case event_traits<rpc::heartbeat>::id:
-            on_heartbeat();
-            break;
-          case event_traits<rpc::invoke>::id:
-            on_invoke(message);
-            break;
-          case event_traits<rpc::chunk>::id: 
-            on_chunk(message);
-            break;
-          case event_traits<rpc::choke>::id:
-            on_choke(message);
-            break;
-          case event_traits<rpc::terminate>::id:
-            printf("worker <%p> got shutdown request from event loop\n",this);
-            m_shutdown_pending = true;
-            m_state = st::shutdown;
-            on_shutdown();
-            break;
-          default:
-            printf( //warning
-              "worker %s dropping unknown type %d message\n", 
-              m_id.string().c_str(),
-              message.id());
-            m_channel.drop();
+          // msgpack_unpack_template->GetFunction()->Set(
+          //   msgpack_bytes_remaining_symbol,
+          //   Integer::New(static_cast<int32_t>(Buffer::Length(buf) - off))
+          //   );
+          return scope.Close(msgpack_http_request_to_v8(&mo));
+        } catch (MsgpackException e) {
+          return ThrowException(e.getThrownException());
         }
 
-        process_prepare();
-      }
-    }
+      case MSGPACK_UNPACK_CONTINUE:
+        return scope.Close(Undefined());
 
-    //==== js->c api ====
-
-    Handle<Value>
-    NodeWorker::Listen(const Arguments &args){
-      NodeWorker *w=ObjectWrap::Unwrap<NodeWorker>(args.This());
-      assert(w->m_state == st::start);
-      w->Ref();
-      return Integer::New(
-        w->listen());
-    }
-
-    Handle<Value>
-    NodeWorker::Heartbeat(const Arguments &args){
-      NodeWorker *w=ObjectWrap::Unwrap<NodeWorker>(args.This());
-      if(w->m_state == st::running
-         || w->m_state == st::shutdown){
-        try{
-          return Boolean::New(
-            w->send<rpc::heartbeat>());
-        } catch (std::exception &e){
-          return ThrowException(
-            Exception::Error(
-              String::New(e.what())));
-        }
-      } else {
-        return Undefined();
-      }
-    }
-
-    Handle<Value>
-    NodeWorker::Shutdown(const Arguments &args){
-      NodeWorker *w=ObjectWrap::Unwrap<NodeWorker>(args.This());
-      assert((int)st::start < (int)w->m_state);
-      if((int)w->m_state < (int)st::shutdown){
-        printf("worker <%p> got shutdown request from js\n",(void*)w);
-        w->m_shutdown_pending = true;
-        w->m_state = st::shutdown;
-        w->set_want_prepare(true);
-      }
-      return Undefined();
-    }
-      
-    Handle<Value>
-    NodeWorker::Stop(const Arguments &args){
-      NodeWorker *w=ObjectWrap::Unwrap<NodeWorker>(args.This());
-      assert((int)st::start < (int)w->m_state);
-      if((int)w->m_state < (int)st::stop){
-        w->m_stop_pending = true;
-        w->m_state = st::stop;
-        w->set_want_prepare(true);
-      }
-      return Undefined();
-    }
-
-    Handle<Value>
-    NodeWorker::LogDebug(const Arguments &args){
-      NodeWorker *w=ObjectWrap::Unwrap<NodeWorker>(args.This());
-      assert((int)st::start < (int)w->m_state);
-      if((int)w->m_state < (int)st::stop){
-        v8::String::Utf8Value val(args[0]->ToString());
-        std::string message = std::string(*val);
-        COCAINE_LOG_DEBUG(w->m_log,message);
-      }
-      return Undefined();
-    }
-    Handle<Value>
-    NodeWorker::LogInfo(const Arguments &args){
-      NodeWorker *w=ObjectWrap::Unwrap<NodeWorker>(args.This());
-      assert((int)st::start < (int)w->m_state);
-      if((int)w->m_state < (int)st::stop){
-        v8::String::Utf8Value val(args[0]->ToString());
-        std::string message = std::string(*val);
-        COCAINE_LOG_INFO(w->m_log,message);
-      }
-      return Undefined();
-    }
-    Handle<Value>
-    NodeWorker::LogWarning(const Arguments &args){
-      NodeWorker *w=ObjectWrap::Unwrap<NodeWorker>(args.This());
-      assert((int)st::start < (int)w->m_state);
-      if((int)w->m_state < (int)st::stop){
-        v8::String::Utf8Value val(args[0]->ToString());
-        std::string message = std::string(*val);
-        COCAINE_LOG_WARNING(w->m_log,message);
-      }
-      return Undefined();
-    }
-    Handle<Value>
-    NodeWorker::LogError(const Arguments &args){
-      NodeWorker *w=ObjectWrap::Unwrap<NodeWorker>(args.This());
-      assert((int)st::start < (int)w->m_state);
-      if((int)w->m_state < (int)st::stop){
-        v8::String::Utf8Value val(args[0]->ToString());
-        std::string message = std::string(*val);
-        COCAINE_LOG_ERROR(w->m_log,message);
-      }
-      return Undefined();
-    }
-
-    //==== js completion helpers
-
-    void
-    NodeWorker::OnConnection(Stream *s){
-      HandleScope scope;
-      Local<Value> argv[1] =
-        {Local<Value>::New(s->handle_)};
-      MakeCallback(handle_,onconnection_sym,1,argv);
-    }
-
-    void
-    NodeWorker::OnHeartbeat(){
-      MakeCallback(handle_,onheartbeat_sym,0,NULL);
-    }
-
-    void
-    NodeWorker::OnShutdown(){
-      MakeCallback(handle_,onshutdown_sym,0,NULL);
-    }
-
-    //==== loop callbacks
-
-    void
-    NodeWorker::on_invoke(io::message_t &message){
-      uint64_t session_id;
-      std::string event;
-
-      message.as<rpc::invoke>(session_id, event);
-
-      printf(
-        "worker %s session %lx: received event %s\n",
-        m_id.string().c_str(),session_id,event.c_str());
-
-      std::shared_ptr<Stream::Shared> stream(
-        Stream::MakeShared(session_id,this));
-
-      try {
-        m_streams.insert(std::make_pair(session_id, stream));
-
-        printf(
-          "worker %s session %lx: started session\n",
-          m_id.string().c_str(),session_id);
-
-        OnConnection(&(**stream));
-            
-      } catch(const std::exception& e) {
-        (*stream)->on_error(invocation_error, e.what());
-      } catch(...) {
-        (*stream)->on_error(invocation_error, "unexpected exception");
-      }
-    }
-
-    void
-    NodeWorker::on_chunk(io::message_t &message){
-      uint64_t session_id;
-      std::string chunk;
-
-      message.as<rpc::chunk>(session_id, chunk);
-              
-      printf(
-        "worker %s session %lx: received chunk length %ld\n",
-        m_id.string().c_str(),session_id,(long int)chunk.size());
-            
-      stream_map_t::iterator it(m_streams.find(session_id));
-
-      // NOTE: This may be a chunk for a failed invocation, in which case there
-      // will be no active stream, so drop the message.
-      if(it != m_streams.end()) {
-        try {
-          (*(it->second))->on_data(const_cast<char*>(chunk.data()),
-                                   chunk.size());
-        } catch(const std::exception& e) {
-          (*(it->second))->on_error(invocation_error, e.what());
-        } catch(...) {
-          (*(it->second))->on_error(invocation_error, "unexpected exception");
-        }
-      }
-
-    }
-
-    void
-    NodeWorker::on_choke(io::message_t &message){
-      uint64_t session_id;
-
-      message.as<rpc::choke>(session_id);
-
-      std::cout << "worker got <end> event" << std::endl;
-
-      printf(
-        "worker %s session %lx: received close\n",
-        m_id.string().c_str(),session_id);
-
-      stream_map_t::iterator it = m_streams.find(session_id);
-
-      // NOTE: This may be a choke for a failed invocation, in which case there
-      // will be no active stream, so drop the message.
-      if(it != m_streams.end()) {
-        try {
-          printf(
-            "worker %s session %lx: input end\n",
-            m_id.string().c_str(),session_id);
-
-          (*(it->second))->on_end();
-              
-        } catch(const std::exception& e) {
-          (*(it->second))->on_error(invocation_error, e.what());
-        } catch(...) {
-          (*(it->second))->on_error(invocation_error, "unexpected exception");
-        }
-      }
-    }
-
-    void
-    NodeWorker::on_shutdown(){
-      printf("shutting down the worker <%p>\n",this);
-      assert(m_state == st::shutdown);
-      assert(!m_shutdown_done);
-      m_shutdown_pending = false;
-      m_shutdown_done = true;
-      stream_map_t::iterator it0, it1;
-      int i = 0;
-      for(it0 = m_streams.begin();
-          it0 != m_streams.end();
-          it0 = it1){
-        it1 = it0;
-        ++it1;
-        (*(it0->second))->on_shutdown(); // this will call m_streams.erase(stream.id)
-        i++;
-      }
-      printf("shut down %d streams\n",i);
-      OnShutdown();
-      if(i==0){
-        m_state = st::stop;
-        m_stop_pending = true;
-        set_want_prepare(true);
-      }
-    }
-
-    void
-    NodeWorker::on_stop(){
-      assert(m_state == st::stop
-             && !m_stop_done);
-      m_stop_done = true;
-      stream_map_t::iterator it0, it1;
-      for(it0 = m_streams.begin();
-          it0 != m_streams.end();
-          it0 = it1){
-        it1 = it0;
-        ++it1;
-        (*(it0->second))->on_stop();
-      }
-      Unref(); // all base belongs to js
-      printf("still got %d refs\n",refs_);
-      send<rpc::suicide>(
-        static_cast<int>(rpc::suicide::normal),
-        std::string("per request"));
-    }
-
-    void
-    NodeWorker::on_terminate(){
-      terminate(rpc::suicide::normal, "per request");
-    }
-
-    void
-    NodeWorker::on_heartbeat(){
-      std::cout << "got heartbeat" << std::endl;
-      OnHeartbeat();
-    }
-
-    //================
-
-    int
-    NodeWorker::listen(){
-      printf("listen\n");
-      if(m_state == st::start){
-        //int z0=0;
-        try{
-          //m_channel.connect(m_endpoint);
-          ;
-        } catch (zmq::error_t &e){
-          //SetErrno(65535);
-          m_state = st::stop;
-          return e.num();
-        } catch (std::exception &e){
-          m_state = st::stop;
-          return 65535;
-        }
-        m_state = st::running;
-        update_watchers_state();
-        
-        // initiate reading
-        std::string blob;
-        assert(!m_channel.recv(blob));
-          
-        bool r=send<rpc::heartbeat>();
-        if(!r){
-          m_state = st::stop;
-          return 65534;
-        }
-        return 0;
-      }
-      return -1;
-    }
-
-    void
-    NodeWorker::terminate(rpc::suicide::reasons reason,
-                          const std::string& message){
-      send<rpc::suicide>(static_cast<int>(reason), message);
-      m_stop_pending = true;
-      m_state = st::stop;
-      set_want_prepare(true);
-    }
-
-    void
-    NodeWorker::set_want_write(bool want){
-      if(want && !m_want_write){
-        m_want_write = true;
-        update_watchers_state();
-      } else if(!want && m_want_write) {
-        m_want_write = false;
-        update_watchers_state();
-      }
-    }
-
-    void
-    NodeWorker::set_want_prepare(bool want){
-      if(want && !m_want_prepare){
-        m_want_prepare = true;
-        update_watchers_state();
-      } else if(!want && m_want_prepare) {
-        m_want_prepare = false;
-        update_watchers_state();
-      }
-    }
-
-    void
-    NodeWorker::update_watchers_state(){
-      int events = 0;
-      if(m_state == state_t::stop){
-        printf("stop poll\n");
-        if(m_watcher_enabled){
-          printf("actually stop\n");
-          uv_timer_stop(m_timer);
-          uv_poll_stop(m_watcher);
-          m_watcher_enabled = false;}
-      } else {
-        if(m_want_write){
-          events |= UV_WRITABLE;}
-        if(m_state != state_t::shutdown){
-          events |= UV_READABLE;}
-        printf("start poll, events %x\n",events);
-        uv_poll_start(m_watcher,events,NodeWorker::uv_on_event);
-        //uv_timer_start(m_timer,NodeWorker::uv_on_timer, 0, 100000000);
-        m_watcher_enabled = true;
-      }
-      if(m_want_prepare){
-        printf("start prepare\n");
-        uv_prepare_start(m_prepare,NodeWorker::uv_on_prepare);
-        uv_check_start(m_check,NodeWorker::uv_on_check);
-        m_prepare_enabled = true;
-      }else{
-        printf("stop prepare\n");
-        if(m_prepare_enabled){
-          printf("actually stop\n");
-          uv_prepare_stop(m_prepare);
-          uv_check_stop(m_check);
-          m_prepare_enabled = false;
-        }
-      }
-    }
-
-    void
-    NodeWorker::writing_enq(Stream *s){
-      assert(ngx_queue_empty(&(s->m_writing_q)));
-      ngx_queue_insert_tail(
-        &m_writing_q,
-        &(s->m_writing_q));
-      printf("writing_enq stream %p, hdl %p\n",s,&(s->m_writing_q));
-      printf("  or, last: %p\n",ngx_queue_last(&m_writing_q));
-      printf("  and offset is %ld\n",offsetof(Stream,m_writing_q));
-      set_want_write(true);
-    }
-
-    void
-    NodeWorker::writing_deq(Stream *s){
-      assert(!ngx_queue_empty(&(s->m_writing_q)));
-      ngx_queue_remove(&(s->m_writing_q));
-      ngx_queue_init(&(s->m_writing_q));
-      if(ngx_queue_empty(&(m_writing_q))){
-        set_want_write(false);}
-    }
-
-    void
-    NodeWorker::pending_enq(Stream *s){
-      assert(ngx_queue_empty(&(s->m_pending_q)));
-      ngx_queue_insert_tail(
-        &m_pending_q,
-        &(s->m_pending_q));
-      set_want_prepare(true);
-    }
-
-    void
-    NodeWorker::pending_deq(Stream *s){
-      assert(!ngx_queue_empty(&(s->m_pending_q)));
-      ngx_queue_remove(&(s->m_pending_q));
-      ngx_queue_init(&(s->m_pending_q));
-      if(ngx_queue_empty(&(m_pending_q))){
-        set_want_prepare(false);}
-    }
-
-
-    void
-    NodeWorker::stream_remove(Stream *s){
-      if(!ngx_queue_empty(&(s->m_pending_q))){
-        ngx_queue_remove(&(s->m_pending_q));
-        ngx_queue_init(&(s->m_pending_q));
-      }
-      if(!ngx_queue_empty(&(s->m_writing_q))){
-        ngx_queue_remove(&(s->m_writing_q));
-        ngx_queue_init(&(s->m_writing_q));
-      }
-      stream_map_t::iterator it =
-        m_streams.find(s->id());
-      if(it != m_streams.end()){
-        m_streams.erase(it);
-      }
-    }      
-
-    bool
-    NodeWorker::send_raw(std::string &blob, int flags){
-      return m_channel.send(blob,flags);
-    }
-
-    void
-    NodeWorker::Initialize(Handle<Object> target){
-      worker_constructor = Persistent<FunctionTemplate>::New(
-        FunctionTemplate::New(New));
-      worker_constructor->InstanceTemplate()->SetInternalFieldCount(1);
-      NODE_SET_PROTOTYPE_METHOD(worker_constructor, "listen", Listen);
-      NODE_SET_PROTOTYPE_METHOD(worker_constructor, "heartbeat", Heartbeat);
-      NODE_SET_PROTOTYPE_METHOD(worker_constructor, "shutdown", Shutdown);
-      NODE_SET_PROTOTYPE_METHOD(worker_constructor, "stop", Stop);
-      NODE_SET_PROTOTYPE_METHOD(worker_constructor, "log_debug", LogDebug);
-      NODE_SET_PROTOTYPE_METHOD(worker_constructor, "log_info", LogInfo);
-      NODE_SET_PROTOTYPE_METHOD(worker_constructor, "log_warning", LogWarning);
-      NODE_SET_PROTOTYPE_METHOD(worker_constructor, "log_error", LogError);
-    
-      target->Set(String::NewSymbol("Worker"),worker_constructor->GetFunction());
-
-      printf("offset of Stream.m_writing_q: %d\n",
-             (int)__builtin_offsetof(Stream,m_writing_q));
-
-      printf("offset of Stream.m_id: %d\n",
-             (int)__builtin_offsetof(Stream,m_id));
-
-      oncomplete_sym = NODE_PSYMBOL("oncomplete");
-      errno_sym = NODE_PSYMBOL("errno");
-      buffer_sym = NODE_PSYMBOL("buffer");
-      domain_sym = NODE_PSYMBOL("domain");
-      bytes_sym = NODE_PSYMBOL("bytes");
-      write_queue_size_sym = NODE_PSYMBOL("writeQueueSize");
-      onconnection_sym = NODE_PSYMBOL("onconnection");
-      onheartbeat_sym = NODE_PSYMBOL("onheartbeat");
-      onshutdown_sym = NODE_PSYMBOL("onshutdown");
-      process_sym = NODE_PSYMBOL("process");
-      heartbeat_sym = NODE_PSYMBOL("heartbeat");
-      
+      default:
+        return ThrowException(Exception::Error(
+                                String::New("Error de-serializing object")));
     }
   }
 }
-
 

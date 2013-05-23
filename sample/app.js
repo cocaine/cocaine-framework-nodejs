@@ -4,6 +4,7 @@ var Q = require("q")
 var co = require("..")
 var argv = require("optimist").argv
 var mp = require("msgpack")
+var __assert = require("assert")
 
 var W,S,L
 
@@ -26,6 +27,7 @@ co.getServices(["storage","logging"],function(Storage,Logger){
         mp.pack({code:200,
                  headers:[
                    ["content-type","text/plain"],
+                   ["content-length","10"],
                    ["x-by","worker"+argv.uuid]]}))
       stream.write("that's who I am\n")
       var m = S.read("manifests",argv.app)

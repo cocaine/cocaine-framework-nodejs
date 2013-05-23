@@ -7,45 +7,45 @@ var mp = require("msgpack")
 
 var W,S,L
 
-co.getServices("storage","logging",function(Storage,Logger){
-    S = new Storage()
-    L = new Logger(argv.app)
+co.getServices(["storage","logging"],function(Storage,Logger){
+  S = new Storage()
+  L = new Logger(argv.app)
+  
+  var W = new co.Worker(argv)
+  W.on("hash",function(stream){
+    //console.log("got http event")
+    L.debug("==== got http event")
+    var request
+    stream.on("data",function(data){
+      __assert(request === undefined)
+      request = W._unpackHttpRequest(data)
+    })
     
-    var W = new co.Worker(argv)
-    W.on("hash",function(stream){
-      //console.log("got http event")
-      L.debug("==== got http event")
-      var request
-      stream.on("data",function(data){
-        __assert(request === undefined)
-        request = W._unpackHttpRequest(data)
+    stream.on("end",function(){
+      stream.write(
+        mp.pack({code:200,
+                 headers:[
+                   ["content-type","text/plain"],
+                   ["x-by","worker"+argv.uuid]]}))
+      stream.write("that's who I am\n")
+      var m = S.read("manifests",argv.app)
+      m.on("data",function(data){
+        //console.log("data",data.length,data)
+        L.debug("data "+data.length+" "+data)
+        var manifests = mp.unpack(data.slice(3))
+        //console.log("manifests",manifests)
+        L.debug("manifests" + manifests)
+        stream.write(JSON.stringify(manifests,null,2))
       })
-      
-      stream.on("end",function(){
-        stream.write(
-          mp.pack({code:200,
-                   headers:[
-                     ["content-type","text/plain"],
-                     ["x-by","worker"+argv.uuid]]}))
-        stream.write("that's who I am\n")
-        var m = S.read("manifests",argv.app)
-        m.on("data",function(data){
-          //console.log("data",data.length,data)
-          L.debug("data "+data.length+" "+data)
-          var manifests = mp.unpack(data.slice(3))
-          //console.log("manifests",manifests)
-          L.debug("manifests" + manifests)
-          stream.write(JSON.stringify(manifests,null,2))
-        })
-        m.on("end",function(){
-          stream.end()
-        })
-        m.on("error",function(error){
-          stream.end(JSON.stringify(error))
-        })
+      m.on("end",function(){
+        stream.end()
+      })
+      m.on("error",function(error){
+        stream.end(JSON.stringify(error))
       })
     })
   })
+})
 
 
 

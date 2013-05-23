@@ -5,14 +5,9 @@ var co = require("..")
 var argv = require("optimist").argv
 var mp = require("msgpack")
 
-var Storage = co.Service("storage")
-var Logger = co.Service("logging")
-
 var W,S,L
 
-Q.all([Storage.resolve(),
-       Logger.resolve()])
-  .done(function(){
+co.getServices("storage","logging",function(Storage,Logger){
     S = new Storage()
     L = new Logger(argv.app)
     

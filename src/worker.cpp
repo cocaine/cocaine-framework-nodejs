@@ -19,6 +19,7 @@
 */
 
 #include <node_buffer.h>
+#include <cocaine/traits.hpp>
 #include "nodejs/worker/worker.hpp"
 
 using namespace worker;
@@ -43,6 +44,7 @@ void node_worker::Initialize(v8::Handle<v8::Object>& exports) {
 	NODE_SET_PROTOTYPE_METHOD(tpl, "send", node_worker::send);
 	NODE_SET_PROTOTYPE_METHOD(tpl, "close", node_worker::close);
 	NODE_SET_PROTOTYPE_METHOD(tpl, "unpackHttpRequest", unpack_http_request);
+	NODE_SET_PROTOTYPE_METHOD(tpl, "sendTerminate", node_worker::send_terminate);
 	exports->Set(String::NewSymbol("communicator"), tpl->GetFunction());
 
 	on_heartbeat_cb = NODE_PSYMBOL("on_heartbeat");
@@ -213,6 +215,57 @@ Handle<Value> node_worker::close(const Arguments& args)
 	return Undefined();
 }
 
+Handle<Value> node_worker::send_terminate(const Arguments& args)
+{
+	HandleScope scope;
+
+	if (args.Length() != 3) {
+		return ThrowException(Exception::TypeError(String::New("3 arguments is required")));
+	}
+
+	if (!args[0]->IsNumber()) {
+		return ThrowException(Exception::TypeError(String::New("first argument must be an integer (session id)")));
+	}
+
+	if (!args[1]->IsNumber()) {
+		return ThrowException(Exception::TypeError(String::New("second argument must be an integer (reason code)")));
+	}
+
+	if (!args[2]->IsString()) {
+		return ThrowException(Exception::TypeError(String::New("first argument must be a string (reason message)")));
+	}
+
+	uint64_t sid = static_cast<uint64_t>(args[0]->Uint32Value());
+	cocaine::io::rpc::terminate::code code = static_cast<cocaine::io::rpc::terminate::code>(args[1]->Uint32Value());
+	std::string msg = *(String::AsciiValue(args[2]));
+
+	node_worker* obj = ObjectWrap::Unwrap<node_worker>(args.This());
+
+	try {
+		obj->msg_write<cocaine::io::rpc::terminate>(sid, code, msg);
+	} catch (const std::exception& e) {
+		return ThrowException(Exception::TypeError(String::New(e.what())));
+	}
+
+	return scope.Close(args[0]);
+}
+
+template<class Event, typename... Args>
+void node_worker::msg_write(uint64_t stream, Args&&... args)
+{
+	msgpack::sbuffer msgbuffer;
+	msgpack::packer<msgpack::sbuffer> packer(msgbuffer);
+
+	typedef cocaine::io::event_traits<Event> traits;
+	packer.pack_array(3);
+	packer.pack_uint32(traits::id);
+	packer.pack_uint64(stream);
+
+	cocaine::io::type_traits<typename traits::tuple_type>::pack(packer, std::forward<Args>(args)...);
+
+	channel->write(msgbuffer.data(), msgbuffer.size());
+}
+
 void node_worker::on_heartbeat() {
 	node::MakeCallback(handle_, on_heartbeat_cb, 0, NULL);
 }
@@ -263,7 +316,6 @@ void node_worker::on_terminate(const uint64_t sid, const int code, const std::st
 
 	node::MakeCallback(handle_, on_terminate_cb, 3, argv);
 }
-
 
 namespace worker {
 

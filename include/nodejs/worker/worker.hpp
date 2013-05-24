@@ -44,6 +44,10 @@ public:
 
 	static v8::Handle<v8::Value> send(const v8::Arguments& args);
 	static v8::Handle<v8::Value> close(const v8::Arguments& args);
+	static v8::Handle<v8::Value> send_terminate(const v8::Arguments& args);
+
+	template<class Event, typename... Args>
+	void msg_write(uint64_t stream, Args&&... args);
 
 private:
 	static v8::Handle<v8::Value> New(const v8::Arguments& args);

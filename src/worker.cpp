@@ -169,6 +169,7 @@ void node_worker::on_message(const cocaine::io::message_t& message)
 			std::string reason;
 			message.as<cocaine::io::rpc::terminate>(code, reason);
 			on_terminate(message.band(), code, reason);
+      break;
 		}
 
 		default: {
@@ -232,7 +233,7 @@ Handle<Value> node_worker::send_terminate(const Arguments& args)
 	}
 
 	if (!args[2]->IsString()) {
-		return ThrowException(Exception::TypeError(String::New("first argument must be a string (reason message)")));
+		return ThrowException(Exception::TypeError(String::New("third argument must be a string (reason message)")));
 	}
 
 	uint64_t sid = static_cast<uint64_t>(args[0]->Uint32Value());

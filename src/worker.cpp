@@ -169,6 +169,7 @@ void node_worker::on_message(const cocaine::io::message_t& message)
 			std::string reason;
 			message.as<cocaine::io::rpc::terminate>(code, reason);
 			on_terminate(message.band(), code, reason);
+      break;
 		}
 
 		default: {

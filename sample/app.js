@@ -7,16 +7,13 @@ var mp = require("msgpack")
 var __assert = require("assert")
 var crypto = require("crypto")
 
-var W,S,L
+var W
 
-co.getServices(["storage","logging"],function(Storage,Logger){
-  S = new Storage()
-  L = new Logger(argv.app)
+co.getServices([],function(){
   
   var W = new co.Worker(argv)
   W.on("hash",function(stream){
     //console.log("got http event")
-    L.debug("==== got hash event")
     var sha512 = crypto.createHash("sha512")
     var request
     stream.on("data",function(data){

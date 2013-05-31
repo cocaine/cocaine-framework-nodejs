@@ -1,6 +1,6 @@
 {
   "name": "cocaine-framework-nodejs",
-  "version": "0.2.0",
+  "version": "0.2.0+loadtest",
   "description": "Node.js framework for Cocaine platform",
   "author": "Oleg Kutkov <olegkutkov@yandex-team.ru>",
   "homepage": "https://github.com/cocaine/cocaine-framework-nodejs",

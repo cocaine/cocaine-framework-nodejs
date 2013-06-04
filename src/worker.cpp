@@ -18,6 +18,7 @@
     along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <errno.h>
 #include <node_buffer.h>
 #include <cocaine/traits.hpp>
 #include "nodejs/worker/worker.hpp"
@@ -70,7 +71,7 @@ Handle<Value> node_worker::New(const v8::Arguments& args) {
 		try {
 			worker_instance = new node_worker(endpoint);
 		} catch (const std::exception& e) {
-			return ThrowException(Exception::TypeError(String::New(e.what())));
+			return ThrowException(Integer::New(errno));
 		}
 
 		worker_instance->Wrap(args.This());
@@ -93,7 +94,7 @@ Handle<Value> node_worker::New(const v8::Arguments& args) {
 		try {
 			worker_instance = new node_worker(host, port);
 		} catch (const std::exception& e) {
-			return ThrowException(Exception::TypeError(String::New(e.what())));
+			return ThrowException(Integer::New(errno));
 		}
 
 		worker_instance->Wrap(args.This());

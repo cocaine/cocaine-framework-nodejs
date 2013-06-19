@@ -13,7 +13,7 @@ co.getServices(["storage","logging"],function(Storage,Logger){
   S = new Storage()
   L = new Logger(argv.app)
   
-  var W = new co.Worker(argv)
+  W = new co.Worker(argv)
   W.on("hash",function(stream){
     //console.log("got http event")
     L.debug("==== got hash event")
@@ -44,6 +44,7 @@ co.getServices(["storage","logging"],function(Storage,Logger){
     L.close()
     process.exit(0)
   })
+  W.connect()
 })
 
 

@@ -1,14 +1,5 @@
 
 {
-  "type":"nodejs",
-  "slave":"/opt/cocaine/framework-nodejs/0.8/sample/app.js",
-  "drivers":{
-    "hash":{
-      "type":"native-server",
-      "args":{
-        "emit":"hash"
-      }
-    }
-  }
+  "slave":"/home/diunko/dvl/no-cocaine/sample.js"
 }
 

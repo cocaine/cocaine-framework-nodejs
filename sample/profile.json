@@ -1,0 +1,7 @@
+
+{
+  "pool-limit":1,
+  "concurrenty":1,
+  "queue-limit":10000
+}
+

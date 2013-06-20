@@ -29,11 +29,11 @@ co.getServices(["storage","logging"],function(Storage,Logger){
     stream.on("end",function(){
       var d = sha512.digest("hex")
       stream.write(
-        mp.pack({code:200,
-                 headers:[
-                   ["content-type","text/plain"],
-                   ["content-length",""+(d.length+1)],
-                   ["x-by","worker"+argv.uuid]]}))
+        ["HTTP/1.0 200 OK",
+         "content-type: text/plain",
+         "content-length: "+(d.length+1),
+         "x-by: worker"+argv.uuid,
+         "\r\n"].join("\r\n"))
       stream.write(d+"\n")
       stream.end()
     })
@@ -42,7 +42,6 @@ co.getServices(["storage","logging"],function(Storage,Logger){
     console.log("worker terminating")
     S.close()
     L.close()
-    process.exit(0)
   })
   W.connect()
 })

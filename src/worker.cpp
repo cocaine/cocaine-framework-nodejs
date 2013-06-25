@@ -200,7 +200,7 @@ Handle<Value> node_worker::send(const Arguments& args) {
 		return ThrowException(Exception::TypeError(String::New(e.what())));
 	}
 
-	return scope.Close(args[0]);
+	return Undefined();
 }
 
 Handle<Value> node_worker::close(const Arguments& args)
@@ -269,10 +269,12 @@ void node_worker::msg_write(uint64_t stream, Args&&... args)
 }
 
 void node_worker::on_heartbeat() {
+	HandleScope scope;
 	node::MakeCallback(handle_, on_heartbeat_cb, 0, NULL);
 }
 
 void node_worker::on_invoke(const uint64_t sid, const std::string& event) {
+	HandleScope scope;
 	Local<Value> argv[2] = {
 		Integer::New(static_cast<uint32_t>(sid))
 		, String::New(event.c_str())
@@ -282,6 +284,8 @@ void node_worker::on_invoke(const uint64_t sid, const std::string& event) {
 }
 
 void node_worker::on_chunk(const uint64_t sid, const std::string& data) {
+	HandleScope scope;
+
   node::Buffer *b = node::Buffer::New(const_cast<char*>(data.c_str()),data.size());
 	Local<Value> argv[2] = {
 		Integer::New(static_cast<uint32_t>(sid))
@@ -292,6 +296,7 @@ void node_worker::on_chunk(const uint64_t sid, const std::string& data) {
 }
 
 void node_worker::on_choke(const uint64_t sid) {
+	HandleScope scope;
 	Local<Value> argv[1] = {
 		Integer::New(static_cast<uint32_t>(sid))
 	};
@@ -300,6 +305,7 @@ void node_worker::on_choke(const uint64_t sid) {
 }
 
 void node_worker::on_error(const uint64_t sid, const int code, const std::string& msg) {
+	HandleScope scope;
 	Local<Value> argv[3] = {
 		Integer::New(static_cast<uint32_t>(sid))
 		, Integer::New(code)
@@ -310,6 +316,7 @@ void node_worker::on_error(const uint64_t sid, const int code, const std::string
 }
 
 void node_worker::on_terminate(const uint64_t sid, const int code, const std::string& reason) {
+	HandleScope scope;
 	Local<Value> argv[3] = {
 		Integer::New(static_cast<uint32_t>(sid))
 		, Integer::New(code)

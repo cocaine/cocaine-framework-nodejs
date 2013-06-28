@@ -1,4 +1,4 @@
-#!/usr/bin/node
+#!/opt/nodejs/0.10/bin/node
 
 var Q = require("q")
 var co = require("..")

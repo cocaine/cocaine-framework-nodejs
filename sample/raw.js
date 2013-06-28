@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/opt/nodejs/0.10/bin/node
 
 var coca_framework = require("./nodejs_cocaine_framework");
 var util = require("util");

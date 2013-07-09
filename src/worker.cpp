@@ -32,6 +32,7 @@ Persistent<String> node_worker::on_chunk_cb;
 Persistent<String> node_worker::on_choke_cb;
 Persistent<String> node_worker::on_error_cb;
 Persistent<String> node_worker::on_terminate_cb;
+Persistent<String> node_worker::on_socket_error_cb;
 
 namespace worker {
   static Handle<Value>
@@ -327,6 +328,13 @@ void node_worker::on_terminate(const uint64_t sid, const int code, const std::st
 	};
 
 	node::MakeCallback(handle_, on_terminate_cb, 3, argv);
+}
+
+void node_worker::on_socket_error(const std::error_code& ec){
+  HandleScope scope;
+  Local<Value> argv[1] = {
+    Integer::New(ec.value())};
+  node::MakeCallback(handle_, on_socket_error_cb, 1, argv);
 }
 
 namespace worker {

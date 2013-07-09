@@ -78,7 +78,9 @@ public:
 
 	void on_event(uv_poll_t* req, int status, int event) {
     if(status == -1){
-      handle_error(std::error_code(errno, std::system_category));
+      uv_err_t err = uv_last_error(uv_default_loop());
+      handle_error(std::error_code(err.sys_errno_, std::system_category()));
+      uv_poll_stop(socket_watcher);
     } else {
       while (ring.size() - rd_offset < 1024) {
         size_t unparsed = rd_offset - rx_offset;
@@ -121,7 +123,7 @@ public:
 		if (length <= 0) {
 			if (length == 0) {
 				// NOTE: This means that the remote peer has closed the connection.
-        handle_read((const char*)NULL, 0);
+        handle_error(std::error_code(ESHUTDOWN, std::system_category()));
 				uv_poll_stop(socket_watcher);
 			}
 

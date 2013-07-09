@@ -62,7 +62,7 @@ private:
 	void on_choke(const uint64_t sid);
 	void on_error(const uint64_t sid, const int code, const std::string& msg);
 	void on_terminate(const uint64_t sid, const int code, const std::string& reason);
-  void on_socket_error(std::error_code);
+  void on_socket_error(const std::error_code&);
 
 	worker::io::app_loop io_loop;
 	std::unique_ptr<worker::io::channel_interface> channel;

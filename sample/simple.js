@@ -1,8 +1,9 @@
-#!/usr/bin/env node
+#!/opt/nodejs/0.10/bin/node
 
 var util = require("util");
 var mp = require("msgpack")
 var bindings = require("bindings")
+var fs = require("fs")
 
 var Handle = bindings("nodejs_cocaine_framework").communicator;
 
@@ -56,6 +57,11 @@ W.on_error = function on_error(sid, code, msg) {
 W.on_terminate = function on_terminate() {
 	console.log("I am asked to terminate");
   
+}
+
+W.on_socket_error = function(){
+  var args = [].slice.call(arguments)
+  fs.writeFileSync("/tmp/node-worker.log",JSON.stringify(args))
 }
 
 W.send(mp.pack([_RPC.handshake, 0, [options.uuid]]))

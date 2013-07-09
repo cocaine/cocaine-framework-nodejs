@@ -54,6 +54,7 @@ void node_worker::Initialize(v8::Handle<v8::Object>& exports) {
 	on_choke_cb = NODE_PSYMBOL("on_choke");
 	on_error_cb = NODE_PSYMBOL("on_error");
 	on_terminate_cb = NODE_PSYMBOL("on_terminate");
+	on_socket_error_cb = NODE_PSYMBOL("on_socket_error");
 }
 
 Handle<Value> node_worker::New(const v8::Arguments& args) {
@@ -127,7 +128,9 @@ node_worker::~node_worker() {
 }
 
 void node_worker::install_handlers() {
-	channel->bind_reader_cb(std::bind(&node_worker::on_message, this, std::placeholders::_1));
+  channel->bind_reader_cb(
+    std::bind(&node_worker::on_message, this, std::placeholders::_1),
+    std::bind(&node_worker::on_socket_error, this, std::placeholders::_1));
 }
 
 void node_worker::on_message(const cocaine::io::message_t& message)

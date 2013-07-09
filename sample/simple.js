@@ -19,7 +19,7 @@ var options={
 console.log(argv);
 console.log(options)
 
-///// worker /////////
+
 var W = new Handle(options.endpoint)
 
 W.on_heartbeat = function on_heartbeat() {

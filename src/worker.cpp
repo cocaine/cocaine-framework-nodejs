@@ -21,6 +21,7 @@
 #include <errno.h>
 #include <node_buffer.h>
 #include <cocaine/traits.hpp>
+#include <cocaine/traits/enum.hpp>
 #include "nodejs/worker/worker.hpp"
 
 using namespace worker;
@@ -162,10 +163,10 @@ void node_worker::on_message(const cocaine::io::message_t& message)
 		}
 
 		case cocaine::io::event_traits<cocaine::io::rpc::error>::id: {
-			cocaine::error_code ec;
+			int error;
 			std::string error_message;
-			message.as<cocaine::io::rpc::error>(ec, error_message);
-			on_error(message.band(), ec, error_message);
+			message.as<cocaine::io::rpc::error>(error, error_message);
+			on_error(message.band(), error, error_message);
 			break;
 		}
 

@@ -21,7 +21,7 @@ var P = new co.Proxy(function(rq,rs0){
           chunks.push(chunk)
         })
         rq.on("end",function(){
-          var rs1 = app.invoke(se[1],Buffer.concat(chunks))
+          var rs1 = app.enqueue(se[1],Buffer.concat(chunks))
           rs1.pipe(rs0)
         })
       }

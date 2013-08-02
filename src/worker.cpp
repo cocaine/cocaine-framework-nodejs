@@ -120,7 +120,9 @@ node_worker::node_worker(const std::string& host, const uint16_t port)
 {
 	typedef cocaine::io::tcp endpoint_t;
 
-	auto socket = std::make_shared<cocaine::io::socket<endpoint_t>>(endpoint_t::endpoint(host, port));
+	auto host1 = boost::asio::ip::address::from_string(host);
+
+	auto socket = std::make_shared<cocaine::io::socket<endpoint_t>>(endpoint_t::endpoint(host1, port));
 	channel.reset(new worker::io::channel<cocaine::io::socket<endpoint_t>>(io_loop, socket));
 	install_handlers();
 }

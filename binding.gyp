@@ -8,6 +8,7 @@
       'CXX': '/usr/bin/clang',
       'libraries': [ '-lboost_program_options-mt',
                      '-lmsgpack',
+                     '-lboost_system',
                      '-lboost_thread-mt'
       ],
       'ldflags':['-Wl,-Bsymbolic-functions','-rdynamic'],

@@ -1,45 +1,45 @@
 #!/usr/bin/env node
 
-var Q = require("q")
-var co = require("..")
-var argv = require("optimist").argv
-var mp = require("msgpack")
-var __assert = require("assert")
-var crypto = require("crypto")
+var Q = require('q')
+var co = require('..')
+var argv = require('optimist').argv
+var mp = require('msgpack')
+var __assert = require('assert')
+var crypto = require('crypto')
 
 var W,S,L
 
-co.getServices(["storage","logging"],function(Storage,Logger){
+co.getServices(['storage','logging'],function(Storage,Logger){
   S = new Storage()
   L = new Logger(argv.app)
   
   W = new co.Worker(argv)
-  W.on("hash",function(stream){
-    //console.log("got http event")
-    L.debug("==== got hash event")
-    var sha512 = crypto.createHash("sha512")
+  W.on('hash',function(stream){
+    //console.log('got http event')
+    L.debug('==== got hash event')
+    var sha512 = crypto.createHash('sha512')
     var request
-    stream.on("data",function(data){
+    stream.on('data',function(data){
       __assert(request === undefined)
       //request = W._unpackHttpRequest(data)
       request = data
       sha512.update(data)
     })
     
-    stream.on("end",function(){
-      var d = sha512.digest("hex")
+    stream.on('end',function(){
+      var d = sha512.digest('hex')
       stream.write(
-        ["HTTP/1.0 200 OK",
-         "content-type: text/plain",
-         "content-length: "+(d.length+1),
-         "x-by: worker"+argv.uuid,
-         "\r\n"].join("\r\n"))
-      stream.write(d+"\n")
+        ['HTTP/1.0 200 OK',
+         'content-type: text/plain',
+         'content-length: '+(d.length+1),
+         'x-by: worker'+argv.uuid,
+         '\r\n'].join('\r\n'))
+      stream.write(d+'\n')
       stream.end()
     })
   })
-  W.on("_terminate",function(){
-    console.log("worker terminating")
+  W.on('_terminate',function(){
+    console.log('worker terminating')
     S.close()
     L.close()
   })

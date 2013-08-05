@@ -1,5 +1,5 @@
 
-var co = require("..")
+var co = require('..')
 
 var dbg = 0
 

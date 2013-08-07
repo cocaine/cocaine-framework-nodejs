@@ -42,8 +42,8 @@ public:
 		wr->bind(error_handler());
 	}
 
-	void bind_reader_cb(rd_func func) {
-		rd->bind(func, error_handler());
+  void bind_reader_cb(rd_func func, err_func err) {
+		rd->bind(func, err);
 	}
 
 	void close() {

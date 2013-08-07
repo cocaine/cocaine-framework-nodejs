@@ -21,6 +21,7 @@
 #include <errno.h>
 #include <node_buffer.h>
 #include <cocaine/traits.hpp>
+#include <cocaine/traits/enum.hpp>
 #include "nodejs/worker/worker.hpp"
 
 using namespace worker;
@@ -32,6 +33,7 @@ Persistent<String> node_worker::on_chunk_cb;
 Persistent<String> node_worker::on_choke_cb;
 Persistent<String> node_worker::on_error_cb;
 Persistent<String> node_worker::on_terminate_cb;
+Persistent<String> node_worker::on_socket_error_cb;
 
 namespace worker {
   static Handle<Value>
@@ -54,6 +56,7 @@ void node_worker::Initialize(v8::Handle<v8::Object>& exports) {
 	on_choke_cb = NODE_PSYMBOL("on_choke");
 	on_error_cb = NODE_PSYMBOL("on_error");
 	on_terminate_cb = NODE_PSYMBOL("on_terminate");
+	on_socket_error_cb = NODE_PSYMBOL("on_socket_error");
 }
 
 Handle<Value> node_worker::New(const v8::Arguments& args) {
@@ -93,8 +96,10 @@ Handle<Value> node_worker::New(const v8::Arguments& args) {
 
 		try {
 			worker_instance = new node_worker(host, port);
+    } catch (const std::system_error& e) {
+      return ThrowException(Integer::New(e.code().value()));
 		} catch (const std::exception& e) {
-			return ThrowException(Integer::New(errno));
+      return ThrowException(String::New(e.what()));
 		}
 
 		worker_instance->Wrap(args.This());
@@ -117,7 +122,9 @@ node_worker::node_worker(const std::string& host, const uint16_t port)
 {
 	typedef cocaine::io::tcp endpoint_t;
 
-	auto socket = std::make_shared<cocaine::io::socket<endpoint_t>>(endpoint_t::endpoint(host, port));
+	auto host1 = boost::asio::ip::address::from_string(host);
+
+	auto socket = std::make_shared<cocaine::io::socket<endpoint_t>>(endpoint_t::endpoint(host1, port));
 	channel.reset(new worker::io::channel<cocaine::io::socket<endpoint_t>>(io_loop, socket));
 	install_handlers();
 }
@@ -127,7 +134,9 @@ node_worker::~node_worker() {
 }
 
 void node_worker::install_handlers() {
-	channel->bind_reader_cb(std::bind(&node_worker::on_message, this, std::placeholders::_1));
+  channel->bind_reader_cb(
+    std::bind(&node_worker::on_message, this, std::placeholders::_1),
+    std::bind(&node_worker::on_socket_error, this, std::placeholders::_1));
 }
 
 void node_worker::on_message(const cocaine::io::message_t& message)
@@ -158,10 +167,10 @@ void node_worker::on_message(const cocaine::io::message_t& message)
 		}
 
 		case cocaine::io::event_traits<cocaine::io::rpc::error>::id: {
-			cocaine::error_code ec;
+			int error;
 			std::string error_message;
-			message.as<cocaine::io::rpc::error>(ec, error_message);
-			on_error(message.band(), ec, error_message);
+			message.as<cocaine::io::rpc::error>(error, error_message);
+			on_error(message.band(), error, error_message);
 			break;
 		}
 
@@ -324,6 +333,13 @@ void node_worker::on_terminate(const uint64_t sid, const int code, const std::st
 	};
 
 	node::MakeCallback(handle_, on_terminate_cb, 3, argv);
+}
+
+void node_worker::on_socket_error(const std::error_code& ec){
+  HandleScope scope;
+  Local<Value> argv[1] = {
+    Integer::New(ec.value())};
+  node::MakeCallback(handle_, on_socket_error_cb, 1, argv);
 }
 
 namespace worker {

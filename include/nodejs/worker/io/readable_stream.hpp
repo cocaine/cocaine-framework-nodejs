@@ -3,7 +3,7 @@
                              - original cocaine version
     Copyright (C) 2013-2013 Oleg Kutkov <olegkutkov@yandex-team.ru>
                              - port to nodejs libuv
-    Copyright (c) 2011-2013 Other contributors as noted in the AUTHORS file.
+    Copyright (c) 2011-2013 Other contributors as noted in thie AUTHORS file.
 
     This file is part of Cocaine.
 
@@ -47,9 +47,9 @@ public:
 		uv_poll_init(loop.get_loop(), socket_watcher, rr_socket->fd());
 		socket_watcher->data = this;
 		ring.resize(65536);
-    	}
+  }
 
-    	readable_stream(app_loop& loop, const std::shared_ptr<socket_type>& socket)
+  readable_stream(app_loop& loop, const std::shared_ptr<socket_type>& socket)
 		: rr_socket(socket)
 		, socket_watcher(new uv_poll_t)
 		, rd_offset(0)
@@ -77,25 +77,31 @@ public:
 	}
 
 	void on_event(uv_poll_t* req, int status, int event) {
-		while (ring.size() - rd_offset < 1024) {
-			size_t unparsed = rd_offset - rx_offset;
+    if(status == -1){
+      uv_err_t err = uv_last_error(uv_default_loop());
+      handle_error(std::error_code(err.sys_errno_, std::system_category()));
+      uv_poll_stop(socket_watcher);
+    } else {
+      while (ring.size() - rd_offset < 1024) {
+        size_t unparsed = rd_offset - rx_offset;
 
-			if (unparsed + 1024 > ring.size()) {
- 				ring.resize(ring.size() << 1);
-				continue;
-			}
+        if (unparsed + 1024 > ring.size()) {
+          ring.resize(ring.size() << 1);
+          continue;
+        }
 
-			// There's no space left at the end of the buffer, so copy all the unparsed
-			// data to the beginning and continue filling it from there.
-			std::memmove(
-				ring.data(),
-				ring.data() + rx_offset,
-				unparsed
-				);
+        // There's no space left at the end of the buffer, so copy all the unparsed
+        // data to the beginning and continue filling it from there.
+        std::memmove(
+          ring.data(),
+          ring.data() + rx_offset,
+          unparsed
+          );
 
-			rd_offset = unparsed;
-			rx_offset = 0;
-		}
+        rd_offset = unparsed;
+        rx_offset = 0;
+      }
+    }
 
 		// Keep the error code if the read() operation fails.
 		std::error_code ec;
@@ -117,6 +123,7 @@ public:
 		if (length <= 0) {
 			if (length == 0) {
 				// NOTE: This means that the remote peer has closed the connection.
+        handle_error(std::error_code(ESHUTDOWN, std::system_category()));
 				uv_poll_stop(socket_watcher);
 			}
 

@@ -62,6 +62,7 @@ private:
 	void on_choke(const uint64_t sid);
 	void on_error(const uint64_t sid, const int code, const std::string& msg);
 	void on_terminate(const uint64_t sid, const int code, const std::string& reason);
+  void on_socket_error(const std::error_code&);
 
 	worker::io::app_loop io_loop;
 	std::unique_ptr<worker::io::channel_interface> channel;
@@ -72,6 +73,7 @@ private:
 	static v8::Persistent<v8::String> on_choke_cb;
 	static v8::Persistent<v8::String> on_error_cb;
 	static v8::Persistent<v8::String> on_terminate_cb;
+	static v8::Persistent<v8::String> on_socket_error_cb;
 };
 
 } //namespace worker

@@ -96,8 +96,10 @@ Handle<Value> node_worker::New(const v8::Arguments& args) {
 
 		try {
 			worker_instance = new node_worker(host, port);
+    } catch (const std::system_error& e) {
+      return ThrowException(Integer::New(e.code().value()));
 		} catch (const std::exception& e) {
-			return ThrowException(Integer::New(errno));
+      return ThrowException(String::New(e.what()));
 		}
 
 		worker_instance->Wrap(args.This());

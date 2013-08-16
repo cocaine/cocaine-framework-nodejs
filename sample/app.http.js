@@ -6,7 +6,7 @@ var argv = require('optimist').argv
 var mp = require('msgpack')
 var __assert = require('assert')
 var crypto = require('crypto')
-var http = require('http')
+var http = require('../lib/http')
 
 var S,L,W
 

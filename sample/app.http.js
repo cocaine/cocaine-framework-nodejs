@@ -6,7 +6,7 @@ var argv = require('optimist').argv
 var mp = require('msgpack')
 var __assert = require('assert')
 var crypto = require('crypto')
-var http = require('http')
+var http = require('../lib/http')
 
 var S,L,W
 
@@ -33,9 +33,16 @@ co.getServices(['storage','logging'],function(Storage,Logger){
       var d = sha512.digest('hex')+'\n'
       rs.writeHead(200,{
         'content-type':'text/plain',
-        'content-length':'' + d.length,
         'x-by':'rocket bees'})
-      rs.end(d)
+      var i = 4
+      ;(function next(){
+        if(i--){
+          rs.write(d)
+          setTimeout(next,200)
+        } else {
+          rs.end(d)
+        }
+      })()
     })
   })
 

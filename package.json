@@ -1,6 +1,6 @@
 {
   "name": "cocaine",
-  "version": "0.2.7",
+  "version": "0.2.8-1",
   "description": "Node.js framework for Cocaine platform",
 
   "author": "Cocaine Project <cocaine@yandex-team.ru>",
@@ -14,8 +14,8 @@
     "node": "0.8.0 - 0.11.999"
   },
   "dependencies": {
-    "msgpack": ">=0.1.7",
-    "bindings": ">=1.0.0",
+    "msgpack": "~0.1.7",
+    "bindings": "~1.0.0",
     "optimist": "~0.4",
     "q":"~0.9",
     "jampack":"0.0.5"

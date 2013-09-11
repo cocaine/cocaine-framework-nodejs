@@ -1,10 +1,11 @@
 {
   "name": "cocaine",
-  "version": "0.2.8-2",
+  "version": "0.2.9-0",
   "dependencies": {
     "msgpack": {
       "version": "0.1.11",
-      "from": "msgpack@~0.1.7",
+      "from": "msgpack@0.1.11",
+      "resolved": "https://registry.npmjs.org/msgpack/-/msgpack-0.1.11.tgz",
       "dependencies": {
         "nodeunit": {
           "version": "0.7.4",
@@ -13,7 +14,8 @@
           "dependencies": {
             "tap": {
               "version": "0.4.4",
-              "from": "tap@>=0.2.3",
+              "from": "tap@0.4.4",
+              "resolved": "https://registry.npmjs.org/tap/-/tap-0.4.4.tgz",
               "dependencies": {
                 "inherits": {
                   "version": "2.0.0",
@@ -27,27 +29,28 @@
                 },
                 "slide": {
                   "version": "1.1.5",
-                  "from": "slide@*"
+                  "from": "slide@1.1.5"
                 },
                 "runforcover": {
                   "version": "0.0.2",
-                  "from": "runforcover@~0.0.2",
+                  "from": "runforcover@0.0.2",
                   "dependencies": {
                     "bunker": {
                       "version": "0.1.2",
-                      "from": "bunker@0.1.X",
+                      "from": "bunker@0.1.2",
                       "dependencies": {
                         "burrito": {
                           "version": "0.2.12",
-                          "from": "burrito@>=0.2.5 <0.3",
+                          "from": "burrito@0.2.12",
                           "dependencies": {
                             "traverse": {
                               "version": "0.5.2",
-                              "from": "traverse@~0.5.1"
+                              "from": "traverse@0.5.2",
+                              "resolved": "https://registry.npmjs.org/traverse/-/traverse-0.5.2.tgz"
                             },
                             "uglify-js": {
                               "version": "1.1.1",
-                              "from": "uglify-js@~1.1.1"
+                              "from": "uglify-js@1.1.1"
                             }
                           }
                         }
@@ -57,65 +60,67 @@
                 },
                 "nopt": {
                   "version": "2.1.2",
-                  "from": "nopt@~2",
+                  "from": "nopt@2.1.2",
                   "dependencies": {
                     "abbrev": {
                       "version": "1.0.4",
-                      "from": "abbrev@1"
+                      "from": "abbrev@1.0.4"
                     }
                   }
                 },
                 "mkdirp": {
                   "version": "0.3.5",
-                  "from": "mkdirp@~0.3"
+                  "from": "mkdirp@0.3.5"
                 },
                 "difflet": {
                   "version": "0.2.6",
-                  "from": "difflet@~0.2.0",
+                  "from": "difflet@0.2.6",
                   "dependencies": {
                     "traverse": {
                       "version": "0.6.3",
-                      "from": "traverse@0.6.x"
+                      "from": "traverse@0.6.3",
+                      "resolved": "https://registry.npmjs.org/traverse/-/traverse-0.6.3.tgz"
                     },
                     "charm": {
                       "version": "0.1.2",
-                      "from": "charm@0.1.x"
+                      "from": "charm@0.1.2"
                     },
                     "deep-is": {
                       "version": "0.1.2",
-                      "from": "deep-is@0.1.x"
+                      "from": "deep-is@0.1.2"
                     }
                   }
                 },
                 "deep-equal": {
                   "version": "0.0.0",
-                  "from": "deep-equal@~0.0.0"
+                  "from": "deep-equal@0.0.0"
                 },
                 "buffer-equal": {
                   "version": "0.0.0",
-                  "from": "buffer-equal@~0.0.0"
+                  "from": "buffer-equal@0.0.0"
                 },
                 "glob": {
                   "version": "3.2.6",
-                  "from": "glob@~3.2.1",
+                  "from": "glob@3.2.6",
+                  "resolved": "https://registry.npmjs.org/glob/-/glob-3.2.6.tgz",
                   "dependencies": {
                     "minimatch": {
                       "version": "0.2.12",
-                      "from": "minimatch@~0.2.11",
+                      "from": "minimatch@0.2.12",
                       "dependencies": {
                         "lru-cache": {
                           "version": "2.3.1",
-                          "from": "lru-cache@2"
+                          "from": "lru-cache@2.3.1"
                         },
                         "sigmund": {
                           "version": "1.0.0",
-                          "from": "sigmund@~1.0.0"
+                          "from": "sigmund@1.0.0"
                         }
                       }
                     },
                     "inherits": {
                       "version": "2.0.1",
-                      "from": "inherits@2"
+                      "from": "inherits@2.0.1"
                     }
                   }
                 }
@@ -127,21 +132,24 @@
     },
     "bindings": {
       "version": "1.0.0",
-      "from": "bindings@~1.0.0"
+      "from": "bindings@1.0.0",
+      "resolved": "https://registry.npmjs.org/bindings/-/bindings-1.0.0.tgz"
     },
     "optimist": {
       "version": "0.4.0",
-      "from": "optimist@~0.4",
+      "from": "optimist@0.4.0",
+      "resolved": "https://registry.npmjs.org/optimist/-/optimist-0.4.0.tgz",
       "dependencies": {
         "wordwrap": {
           "version": "0.0.2",
-          "from": "wordwrap@~0.0.2"
+          "from": "wordwrap@0.0.2"
         }
       }
     },
     "q": {
       "version": "0.9.6",
-      "from": "q@~0.9"
+      "from": "q@0.9.6",
+      "resolved": "https://registry.npmjs.org/q/-/q-0.9.6.tgz"
     },
     "jampack": {
       "version": "0.0.5",

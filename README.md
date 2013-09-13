@@ -44,7 +44,7 @@ var handle = worker.getListenHandle("http") // the handle implements a
 
 var server = new http.Server(...) // the same thing as above
 
-server.listen(handle) // as per [1], start listen on cocaine handle
+server.listen(handle) // as per [1], start listening on cocaine handle
 ```
 
 To let the cocaine-runtime know what to run in our app, we put

@@ -33,7 +33,7 @@ To get our app working in Cocaine cloud, let's add just a couple of things.
 var cocaine = require('cocaine')
 var http = cocaine.http // monkey-patches node's original http server
 
-var optimist = require('optimist').argv //which is actually a hash
+var argv = require('optimist').argv //which is actually a hash
 // looking like { opt: 'value'}
 
 var worker = new cocaine.Worker(argv)
@@ -63,7 +63,7 @@ git clone url/the_app
 cd the_app
 npm install
 tar -czf ../the_app.tgz
-cocaine-tool app upload -n the_app --package ../the_app.tgz
+cocaine-tool app upload -n the_app --package ../the_app.tgz --manifest manifest.json
 >app the_app has been successfully uploaded
 ```
 

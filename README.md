@@ -161,6 +161,8 @@ app0.on('connect', function(){
 
 ```
 
+## References
+
 [1] http://nodejs.org/api/net.html#net_server_listen_handle_callback
 
 [2] http://github.com/diunko/cocaine-sample-app/tree/simplest

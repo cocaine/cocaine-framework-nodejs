@@ -55,7 +55,7 @@ manifest.json:
 { "slave":"app.js" }
 ```
 
-Since the app.js has to be an executable, we put shebang on first line
+Since the app.js has to be an executable, we put shebang on the first line
 and don't forget about setting an executable bit.
 
 See the complete app here [2].

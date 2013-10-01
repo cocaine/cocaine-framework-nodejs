@@ -30,6 +30,7 @@ server.listen(8080)
 To get our app working in Cocaine cloud, let's add just a couple of things.
 
 ```js
+#!/path/to/node
 var cocaine = require('cocaine')
 var http = cocaine.http // monkey-patches node's original http server
 
@@ -53,6 +54,9 @@ manifest.json:
 ```js
 { "slave":"app.js" }
 ```
+
+Since the app.js has to be an executable, we put shebang on first line
+and don't forget about setting an executable bit.
 
 See the complete app here [2].
 
@@ -79,6 +83,7 @@ curl -v http://<cloud.front>/the_app/http/
 ### Make use of Cocaine services
 
 ```js
+#!/path/to/node
 
 cocaine.getServices(['geobase','uatraits','logging'], function(geo,ua,log){
     
@@ -117,11 +122,11 @@ cocaine.getServices(['geobase','uatraits','logging'], function(geo,ua,log){
 
 See [3] for complete sources.
 
-### Use Cocaine services from outside of the cloud
+### Use Cocaine services from the outside of the cloud
 
-To fully control the lifetime's flow, you can use Client. It resolves
-services for you, keeps services cache, and resets resolved services
-cache on locator dis-/re- connect. 
+To fully control the client-side services lifetime flow, you can use
+Client. It resolves services for you, keeps services cache, and resets
+resolved services cache on locator disconnect.
 
 ```js
 var cli = new require('cocaine').Client()

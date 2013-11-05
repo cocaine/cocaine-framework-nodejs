@@ -6,10 +6,9 @@
                    'src/worker.cpp'
       ],
       'CXX': '/usr/bin/clang',
-      'libraries': [ '-lboost_program_options-mt',
+      'libraries': [
                      '-lmsgpack',
-                     '-lboost_system',
-                     '-lboost_thread-mt'
+                     '-lboost_system'
       ],
       'ldflags':['-Wl,-Bsymbolic-functions','-rdynamic'],
       'cflags': ['-std=c++0x','-g','-O0','-Wno-invalid-offsetof'],

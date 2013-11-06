@@ -81,6 +81,7 @@ public:
       uv_err_t err = uv_last_error(uv_default_loop());
       handle_error(std::error_code(err.sys_errno_, std::system_category()));
       uv_poll_stop(socket_watcher);
+      return;
     } else {
       while (ring.size() - rd_offset < 1024) {
         size_t unparsed = rd_offset - rx_offset;

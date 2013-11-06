@@ -24,9 +24,10 @@
 #include <node.h>
 #include <cocaine/asio/local.hpp>
 #include <cocaine/asio/tcp.hpp>
-#include <cocaine/asio/socket.hpp>
+#include "nodejs/worker/io/socket.hpp"
 #include "nodejs/worker/app_loop.hpp"
 #include "nodejs/worker/io/channel.hpp"
+#include "nodejs/worker/io/async_connector.hpp"
 
 namespace worker {
 
@@ -52,10 +53,13 @@ public:
 private:
 	static v8::Handle<v8::Value> New(const v8::Arguments& args);
 
+	template <class Socket>
+	void after_connect(std::shared_ptr<Socket>, std::shared_ptr<worker::io::async_connector<Socket>>);
+
 	void install_handlers();
 
+	void on_connect();
 	void on_message(const cocaine::io::message_t& message);
-
 	void on_heartbeat();
 	void on_invoke(const uint64_t sid, const std::string& event);
 	void on_chunk(const uint64_t sid, const std::string& data);
@@ -67,6 +71,7 @@ private:
 	worker::io::app_loop io_loop;
 	std::unique_ptr<worker::io::channel_interface> channel;
 
+	static v8::Persistent<v8::String> on_connect_cb;
 	static v8::Persistent<v8::String> on_heartbeat_cb;
 	static v8::Persistent<v8::String> on_invoke_cb;
 	static v8::Persistent<v8::String> on_chunk_cb;

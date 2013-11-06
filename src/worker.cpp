@@ -144,10 +144,10 @@ node_worker::after_connect(std::shared_ptr<Socket> socket, std::shared_ptr<worke
 	printf("after_connect handler\n");
 	connector->unbind();
 
-	on_connect();
-  
 	channel.reset(new worker::io::channel<Socket>(io_loop, socket));
 	install_handlers();
+
+	on_connect();
 }
 
 

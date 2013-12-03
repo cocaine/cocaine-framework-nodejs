@@ -64,8 +64,7 @@ public:
     bind(ConnectHandler connect_handler, ErrorHandler error_handler) {
         m_handle_connect = connect_handler;
         m_handle_error = error_handler;
-        int r = uv_poll_start(m_socket_watcher, UV_WRITABLE, UvEvent<async_connector>::on_uv_event);
-        printf("uv_poll_start result: %d\n",r);
+        uv_poll_start(m_socket_watcher, UV_WRITABLE, UvEvent<async_connector>::on_uv_event);
     }
 
     void
@@ -87,13 +86,11 @@ public:
     void on_event(uv_poll_t* req, int status, int event){
         if(status < 0){
             uv_err_t err = uv_last_error(uv_default_loop());
-            printf("connect on_event status<0, errno %d\n",err.sys_errno_);
-            //handle_error(std::error_code(err.sys_errno_, std::system_category()));
-            //uv_poll_stop(socket_watcher);
 
             if(err.sys_errno_ != EINPROGRESS){
                 auto ec = std::error_code(err.sys_errno_, std::system_category());
                 m_handle_error(ec);
+                uv_poll_stop(m_socket_watcher);
                 return;
             }
             return;

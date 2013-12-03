@@ -141,7 +141,6 @@ template <class Socket>
 void
 node_worker::after_connect(std::shared_ptr<Socket> socket, std::shared_ptr<worker::io::async_connector<Socket>> connector){
 
-	printf("after_connect handler\n");
 	connector->unbind();
 
 	channel.reset(new worker::io::channel<Socket>(io_loop, socket));
@@ -241,7 +240,6 @@ Handle<Value> node_worker::close(const Arguments& args)
 	node_worker* obj = ObjectWrap::Unwrap<node_worker>(args.This());
 
 	try {
-		printf("closing channel");
 		if(obj->channel){
 			obj->channel->close();
 		}
@@ -340,7 +338,6 @@ void node_worker::on_choke(const uint64_t sid) {
 }
 
 void node_worker::on_error(const uint64_t sid, const int code, const std::string& msg) {
-	printf("on_error handler\n");
 	HandleScope scope;
 	Local<Value> argv[3] = {
 		Integer::New(static_cast<uint32_t>(sid))

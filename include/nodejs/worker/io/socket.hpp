@@ -110,10 +110,8 @@ struct socket {
             if(errno != EINPROGRESS){
                 ec = std::error_code(errno, std::system_category());
                 //::close(m_fd);
-                printf("connect error %d\n",errno);
             }
         }
-        printf("after connect call\n");
     }
 
     ssize_t

@@ -13,6 +13,15 @@ var timeout = baseTimeout
 var maxTries = 8
 var tries = 0
 
+var L = cli.Logger('testtest')
+var S = cli.Service('storage')
+
+
+
+function doSomething
+
+
+
 cli.on('connect', function(){
   timeout = baseTimeout
   tries = 0

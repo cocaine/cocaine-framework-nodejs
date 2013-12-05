@@ -1,12 +1,10 @@
 
-var _ = require('./lib/service')
-exports.Service = _.Service
-exports.getServices = _.getServices
+var _ = require('./lib/client/client')
+exports.Client = _.Client
 
-exports.Worker = require('./lib/worker').Worker
-exports.Proxy = require('./lib/proxy').Proxy
+exports.Worker = require('./lib/worker/worker').Worker
 
 Object.defineProperty(exports,'http',{
-  get:function(){return require('./lib/http')}
+  get:function(){return require('./lib/worker/http')}
 })
 

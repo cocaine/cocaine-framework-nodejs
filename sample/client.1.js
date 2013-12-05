@@ -1,5 +1,7 @@
 
-var cli = new (require('../lib/client').Client)()
+var mp = require('msgpack')
+
+var cli = new (require('../lib/client/client').Client)()
 
 
 cli.resolve('node', function(err, result){
@@ -31,11 +33,18 @@ function doSomething(){
     console.log("so what's in store?")
     S.find('manifests', ['app'], function(err, appNames){
       if(err){
-        L.debug('storage error', err)
-        return err
+        return L.debug('storage error', err)
       }
-      L.debug("there's something for us:", appNames)
-      console.log("there's something for us:", appNames)
+      if(0 < appNames.length){
+        console.log("there's something for us:", appNames)
+        console.log("so what is %s?", appNames[0])
+        S.read('manifests', appNames[0], function(err, result){
+          if(err){
+            return L.debug('storage error', err)
+          }
+          console.log(mp.unpack(result))
+        })
+      }
     })
   }
 }

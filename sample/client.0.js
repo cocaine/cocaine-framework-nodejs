@@ -1,11 +1,8 @@
 
 
-var cli = new (require('../lib/client').Client)()
+var cli = new (require('../lib/client/client').Client)()
 
-
-cli.resolve('node', function(err, result){
-  console.log('resolve done:', result)
-})
+cli.connect()
 
 var baseTimeout = 500
 var timeout = baseTimeout
@@ -13,18 +10,33 @@ var timeout = baseTimeout
 var maxTries = 8
 var tries = 0
 
-var L = cli.Logger('testtest')
-var S = cli.Service('storage')
+//var L = cli.Logger('testtest')
+//var S = cli.Service('storage')
 
+var i = 0
 
+//L.connect()
 
-function doSomething
+//cli.close()
+
+//L.once('connect', doSomething)
+//S.once('connect', doSomething)
+
+function doSomething(){
+  if(++i === 1){
+    console.log('closing')
+    L.close()
+    //S.close()
+    cli.close()
+  }
+}
 
 
 
 cli.on('connect', function(){
   timeout = baseTimeout
   tries = 0
+  cli.close()
 })
 
 cli.on('error', function(err){

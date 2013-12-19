@@ -1,4 +1,3 @@
-
 # Cocaine NodeJS Framework
 
 ## Examples of usage
@@ -170,9 +169,4 @@ app0.on('connect', function(){
 
 [1] http://nodejs.org/api/net.html#net_server_listen_handle_callback
 
-[2] http://github.com/diunko/cocaine-sample-app/tree/simplest
-
-[3] http://github.com/diunko/cocaine-sample-app/tree/services
-
-[4] http://github.com/diunko/cocaine-sample-app/tree/client
-
+[2] http://github.com/diunko/cocaine-sample-app/blob/master/app.js

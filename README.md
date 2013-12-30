@@ -176,13 +176,12 @@ and communicating to locator and target services.
 
 ```js
 var cli = new require('cocaine').Client()
-var App = cli.resolve('the_app')
+var app = cli.Service('the_app')
 
-var app0 = new App()
-app0.connect()
+app.connect()
 
-app0.on('connect', function(){
-    app0.enqueue('handle','anydata', function(err, result){
+app.on('connect', function(){
+    app.enqueue('handle','anydata', function(err, result){
         if(err) {
            console.log('app error', err)
         } else {

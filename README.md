@@ -83,73 +83,94 @@ curl -v http://<cloud.front>/the_app/http/
 ### Make use of Cocaine services
 
 ```js
-#!/path/to/node
 
-cocaine.getServices(['geobase','uatraits','logging'], function(geo,ua,log){
-    
-    var server = new http.Server(function(req, res){
-        req.on('data', function(data){
-            body.push(data)
-        })
-        
-        req.on('end', function(){      
-            var names
-            geo.region_id(req.headers['x-real-ip'])
-                .then(function(regionId){
-                    log.debug('found region %d for %s', regionId, req.headers['x-real-ip'])
-                    return geo.names(regionId)
-                })
-                .then(function(names0){
-                    log.debug('names for region %d are %s', regionId, names0.join())
-                    names = names0
-                    return geo.coordinates(regionId)
-                })
-                .then(function(coords){
-                    log.debug('coordinates for region %d are %s', regionId, coords.join())
-                    res.end('You could be somewhere around '+
-                            names.join() + ' which is at ' + coords)
-                })
-        })
-    })
-    
-    log.info('cocaine worker', argv.uuid, 'starting')
-    
-    server.listen(handle)
+var cocaine = require("cocaine")
 
+var cli = new cocaine.Client(["localhost", 10053])
+
+var log = new cli.Logger("myprefix") // logs lines like "myprefix/..."
+
+cli.on('error', function(err){
+    console.log('client error', err)
 })
 
+log.on('error', function(err){
+    console.log('logger error', err)
+})
+
+
+log.connect()
+
+log.on("connect", function() {
+
+    cli.getServices(['geobase'], function(err, geo, ua){
+        var names
+        
+        log.info("looking up regionId for ip 1.2.3.4")
+        
+        geo.region_id("1.2.3.4", function(err, regionId) {
+            if(err) return _handleError(err)
+
+            log.debug("found region %d for %s", regionId, "1.2.3.4")
+
+            geo.names(regionId, function(err, names){
+                if(err) return _handleError(err)
+
+                log.debug("names for region %d are %s", regionId, names.join())
+
+                geo.coordinates(regionId, function(coords){
+                    if(err) return _handleError(err)
+
+                    log.debug('coordinates for region %d are %s', regionId, coords.join())
+
+                })
+            })
+        })
+    })
+})
+
+function _handleError(err){
+    console.log('service error', err)
+}
 ```
 
-See [3] for complete sources.
+See
+ [client-simple](http://github.com/cocaine/cocaine-framework-nodejs/blob/master/sample/client.0.js)
+ for complete source of the simplest cocaine client app.
 
 ### Use Cocaine services from the outside of the cloud
 
-To fully control the client-side services lifetime flow, you can use
+To fully control a client to services, you can use
 Client. It resolves services for you, keeps services cache, and resets
 resolved services cache on locator disconnect.
+
 
 ```js
 var cli = new require('cocaine').Client()
 
-var Storage = cli.resolve('storage')
+var storage = cli.Service('storage')
 
-var storage0 = new Storage()
-
-storage0.on('error', function(err){
+storage.on('error', function(err){
     // reconnect on network error
 })
 
-storage0.connect()
+storage.connect()
 
-storage0.on('connect', function(){
-    storage0.write('collection','key','value')
-        .then(function(){
-            console.log(
-        })
+storage.on('connect', function(){
+    storage0.write('collection','key','value', function(err){
+        if(err){
+            console.log('error writing to storage', err)
+            return
+        }
+        
+        console.log(done 'writing to storage')
+    })
 })
 ```
 
-See [4] for examples of fine-grained services usage.
+See [client-reconnect](http://github.com/cocaine/cocaine-framework-nodejs/sample/client.1.js)
+for example of handling various socket-level failures when connecting
+and communicating to locator and target services.
 
 ### Access your application as a Cocaine service
 
@@ -161,7 +182,13 @@ var app0 = new App()
 app0.connect()
 
 app0.on('connect', function(){
-    app0.enqueue('handle','anydata')
+    app0.enqueue('handle','anydata', function(err, result){
+        if(err) {
+           console.log('app error', err)
+        } else {
+          console.log('app response is', result)
+        }
+    })
 })
 
 ```
@@ -169,10 +196,4 @@ app0.on('connect', function(){
 ## References
 
 [1] http://nodejs.org/api/net.html#net_server_listen_handle_callback
-
-[2] http://github.com/diunko/cocaine-sample-app/tree/simplest
-
-[3] http://github.com/diunko/cocaine-sample-app/tree/services
-
-[4] http://github.com/diunko/cocaine-sample-app/tree/client
 

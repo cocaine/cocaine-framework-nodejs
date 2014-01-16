@@ -1,7 +1,7 @@
 
 var mp = require('msgpack')
 
-var cli = new (require('../lib/client/client').Client)()
+var cli = new (require('../lib/client/client').Client)(['coca', 10053])
 
 
 cli.resolve('node', function(err, result){
@@ -59,12 +59,14 @@ cli.on('connect', function(){
 cli.on('error', function(err){
   if(Array.isArray(err)){
     if(err[0] === 'connect'){
-      console.log("connect fail. will we retry?")
-      if(tries++ < maxTries){
+      console.log("connect fail. will we retry?", err[1])
+      console.log('tries', maxTries, tries, err[1].code)
+
+      if(maxTries < tries++ || err[1].code === 'EADDRINFO' ){
+        cli.emit('error', err[1])
+      } else {
         cli.setErrorHandler('retryConnect', [timeout])
         timeout <<= 1
-      } else {
-        cli.emit('error', err[1])
       }
     } else if(err[0] === 'socket'){
       console.log("fail on connected socket. will we reconnect?")

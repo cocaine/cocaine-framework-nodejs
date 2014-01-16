@@ -16,9 +16,7 @@ app.on('error', function(err){
 app.connect()
 
 app.on('connect', function(){
-  var s = app.enqueue('http', mp.pack(['GET','/','HTTP/1.0',[],'']))
-
-  console.log(s)
+  var s = app.enqueue('http', mp.pack(['GET','/','HTTP/1.0',[['some-header','value']],'']))
 
   s.on('data', function(data){
     console.log('reply chunk',data)

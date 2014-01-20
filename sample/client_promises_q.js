@@ -1,10 +1,12 @@
 
 var Q = require('q')
 
-var promises = require('../lib/client/methods/promises_shim').Q(Q)
-var methods = require('../lib/client/methods/promises')(promises)
+var Client = require('../lib/client/client').Client
 
-var cli = new (require('../lib/client/client').Client)(null, methods)
+var promises = Client.methods.promises_shim.Q(Q)
+var methods = Client.methods.promises(promises)
+
+var cli = new Client(null, methods)
 
 var mp = require('msgpack')
 

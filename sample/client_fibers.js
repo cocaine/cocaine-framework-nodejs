@@ -1,9 +1,11 @@
 
 var Fiber = require('fibers')
 
-var methods = require('../lib/client/methods/fibers')(Fiber)
+var Client = require('../lib/client/client').Client
 
-var cli = new (require('../lib/client/client').Client)(null, methods)
+var methods = Client.methods.fibers(Fiber)
+
+var cli = new Client(null, methods)
 
 var mp = require('msgpack')
 

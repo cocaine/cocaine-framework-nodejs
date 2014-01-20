@@ -152,8 +152,8 @@
       "resolved": "https://registry.npmjs.org/q/-/q-0.9.6.tgz"
     },
     "jampack": {
-      "version": "0.0.5",
-      "from": "jampack@0.0.5"
+      "version": "0.0.7",
+      "from": "jampack@0.0.7"
     }
   }
 }

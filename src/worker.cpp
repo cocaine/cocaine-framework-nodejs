@@ -151,7 +151,7 @@ node_worker::after_connect(std::shared_ptr<Socket> socket, std::shared_ptr<worke
 
 
 void node_worker::install_handlers() {
-  channel->bind_reader_cb(
+  channel->bind_cb(
     std::bind(&node_worker::on_message, this, std::placeholders::_1),
     std::bind(&node_worker::on_socket_error, this, std::placeholders::_1));
 }

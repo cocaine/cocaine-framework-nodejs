@@ -21,6 +21,7 @@
 #ifndef NODEJS_COCAINE_IO_CHANNEL_HPP
 #define NODEJS_COCAINE_IO_CHANNEL_HPP
 
+#include <uv.h>
 #include <cocaine/rpc/decoder.hpp>
 #include "readable_stream.hpp"
 #include "writable_stream.hpp"
@@ -34,33 +35,111 @@ class channel
 	: public channel_interface {
 
 public:
-	channel(app_loop& loop, const std::shared_ptr<Socket>& socket)
-		: rd(new cocaine::io::decoder<readable_stream<Socket>>())
-		, wr(new writable_stream<Socket>(loop, socket)) {
+	channel(app_loop &loop, const std::shared_ptr<Socket> &_socket)
+		: active_events(0)
+		, socket(_socket)
+		, watcher(new uv_poll_t)
+		, rd_stream(std::make_shared<readable_stream<Socket>>(socket))
+		, rd(new cocaine::io::decoder<readable_stream<Socket>>())
+		, wr(new writable_stream<Socket>(socket))
+		, stamp(12345) {
 
-		rd->attach(std::make_shared<readable_stream<Socket>>(loop, socket));
-		wr->bind(error_handler());
+		rd->attach(rd_stream);
+		uv_poll_init(loop.get_loop(), watcher.get(), _socket->fd());
+		watcher->data = this;
 	}
 
-  void bind_reader_cb(rd_func func, err_func err) {
+	void bind_cb(rd_func func, err_func err) {
+		if(active_events != 0) {
+			throw std::runtime_error(cocaine::format("bind with active_events %d", active_events));
+		}
+		active_events = UV_READABLE;
+		std::cout << "start poll on fd " << socket->fd() << ", events " << active_events << std::endl;
+		uv_poll_start(watcher.get(), active_events, channel<Socket>::uv_on_event); 
 		rd->bind(func, err);
+		wr->bind(err);
 	}
 
 	void close() {
+		if(active_events){
+			active_events = 0;
+			uv_poll_stop(watcher.get());
+		}
 		rd->unbind();
 		wr->unbind();
 	}
 
 	void write(const char* data, const size_t size) {
-		wr->write(data, size);
+		std::cout << "channel: write data, len " << size << std::endl;
+		bool continue_writing = wr->write(data, size);
+		if(continue_writing && !(active_events & UV_WRITABLE)){
+			active_events |= UV_WRITABLE;
+
+			std::cout << "start write poll on fd " << socket->fd() << ", events " << active_events << std::endl;
+			
+			uv_poll_start(watcher.get(), active_events, channel<Socket>::uv_on_event);
+		}
+	}
+
+	static
+	void uv_on_event(uv_poll_t *req, int status, int event){
+		channel<Socket> *self = static_cast<channel<Socket>*>(req->data);
+
+		std::cout << "stamp: " << self->stamp << std::endl;
+		std::cout << "uv_on_event, status:" << status << " event: " << event
+							<< " fd: " << self->socket->fd() << " active_events: "<< self->active_events << std::endl;
+		std::cout << "error? " << (status!=0) << std::endl;
+		
+		if(status != 0){
+			std::cout << "in error branch" << std::endl;
+			uv_err_t err = uv_last_error(uv_default_loop());
+			std::error_code ec(err.sys_errno_, std::system_category());
+			
+			if(self->active_events & UV_READABLE){
+				self->rd_stream->on_event(status);
+			}
+			if(self->active_events & UV_WRITABLE){
+				self->wr->on_event(status);
+			}
+			// uv_poll_stop(watcher.get()); // not actually needed
+			return;
+		}
+		
+		if(self->active_events & event & UV_READABLE){
+			std::cout << "handling readable" << std::endl;
+			bool reading = self->rd_stream->on_event(status);
+			if(!reading){
+				self->active_events &= ~UV_READABLE;
+				std::cout << "stop reading" << std::endl;
+				uv_poll_start(req, self->active_events, channel<Socket>::uv_on_event);
+			}
+		} 
+
+		if(self->active_events & event & UV_WRITABLE){
+			std::cout << "handling writable" << std::endl;
+			bool writing = self->wr->on_event(status);
+			if(!writing){
+				std::cout << "stop writing" << std::endl;
+				self->active_events &= ~UV_WRITABLE;
+				uv_poll_start(req, self->active_events, channel::uv_on_event);
+			}
+		}
 	}
 
 private:
+
+	int active_events;
+	const std::shared_ptr<Socket> socket;
+	std::shared_ptr<uv_poll_t> watcher;
+
+	std::shared_ptr<readable_stream<Socket>> rd_stream;
 	std::unique_ptr<cocaine::io::decoder<readable_stream<Socket>>> rd;
 	std::unique_ptr<writable_stream<Socket>> wr;
+
+	int stamp;
 };
 
-}}
+}}	// namespace worker::io
 
-#endif // namespace worker::io
+#endif
 

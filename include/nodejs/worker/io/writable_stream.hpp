@@ -28,8 +28,6 @@
 #include <mutex>
 #include <uv.h>
 #include <cocaine/common.hpp>
-#include "nodejs/worker/app_loop.hpp"
-#include "nodejs/worker/uv_event.hpp"
 
 namespace worker { namespace io {
 
@@ -41,28 +39,17 @@ public:
 	typedef Socket socket_type;
 	typedef typename socket_type::endpoint_type endpoint_type;
 
-	writable_stream(app_loop& loop, endpoint_type endpoint)
-		: wr_socket(std::make_shared<socket_type>(endpoint))
-		, socket_watcher(new uv_poll_t)
-		, tx_offset(0)
-		, wr_offset(0) {
-		uv_poll_init(loop.get_loop(), socket_watcher, wr_socket->fd());
-		socket_watcher->data = this;
-		ring.resize(65536);
-	}
-
-	writable_stream(app_loop& loop, const std::shared_ptr<socket_type>& socket)
+	writable_stream(const std::shared_ptr<socket_type>& socket)
 		: wr_socket(socket)
-		, socket_watcher(new uv_poll_t)
 		, tx_offset(0)
 		, wr_offset(0) {
-		uv_poll_init(loop.get_loop(), socket_watcher, wr_socket->fd());
-		socket_watcher->data = this;
+
+		std::cout << "make writable_stream" << std::endl;
 		ring.resize(65536);
 	}
 
 	~writable_stream() {
-		delete socket_watcher;
+		//pass
 	}
 
 	template<class ErrorHandler>
@@ -74,7 +61,7 @@ public:
 		handle_error = nullptr;
 	}
 
-	void write(const char* data, size_t size) {
+	bool write(const char* data, size_t size) {
 		std::unique_lock<std::mutex> m_lock(ring_mutex);
 
 		if (tx_offset == wr_offset) {
@@ -86,7 +73,7 @@ public:
 
 			if (sent >= 0) {
 				if (static_cast<size_t>(sent) == size) {
-					return;
+					return false;
 				}
 
 				data += sent;
@@ -118,44 +105,49 @@ public:
 
 		wr_offset += size;
 
-		uv_poll_start(socket_watcher, UV_WRITABLE, UvEvent<writable_stream>::on_uv_event);
+		return true;
 	}
 
-	void on_event(uv_poll_t* req, int status, int event) {
-		std::unique_lock<std::mutex> m_lock(ring_mutex);
+	bool on_event(int status) {
+		if(status != 0){
+			uv_err_t err = uv_last_error(uv_default_loop());
+			handle_error(std::error_code(err.sys_errno_, std::system_category()));
+			return false;
+		} else {
+			std::unique_lock<std::mutex> m_lock(ring_mutex);
 
-		if (tx_offset == wr_offset) {
-			uv_poll_stop(socket_watcher);
-			return;
+			if (tx_offset == wr_offset) {
+				return false;
+			}
+
+			// Keep the error code if the write() operation fails.
+			std::error_code ec;
+
+			// Try to send all the data at once.
+			ssize_t sent = wr_socket->write(
+				ring.data() + tx_offset,
+				wr_offset - tx_offset,
+				ec
+				);
+
+			if (ec) {
+				handle_error(ec);
+				return false;
+			}
+
+			if (sent > 0) {
+				tx_offset += sent;
+			}
+
+			return true;
+
 		}
-
-		// Keep the error code if the write() operation fails.
-		std::error_code ec;
-
-		// Try to send all the data at once.
-		ssize_t sent = wr_socket->write(
-					 ring.data() + tx_offset,
-					 wr_offset - tx_offset,
-					 ec
-					);
-
-		if (ec) {
-			handle_error(ec);
-			return;
-		}
-
-		if (sent > 0) {
-			tx_offset += sent;
-		}
-
 	}
 
 private:
 	// NOTE: Sockets can be shared among multiple queues, at least to be able
 	// to write and read from two different queues.
 	const std::shared_ptr<socket_type> wr_socket;
-
-	uv_poll_t* socket_watcher;
 
 	std::vector<char> ring;
 
@@ -167,7 +159,7 @@ private:
 	// Write error handler.
 	std::function<
 		void(const std::error_code&)
-	> handle_error;
+		> handle_error;
 };
 
 }} // namespace worker::io

@@ -31,9 +31,9 @@ public:
 	}
 
 	typedef std::function<void(const cocaine::io::message_t& message)> rd_func;
-  typedef std::function<void(const std::error_code& code)> err_func;
+	typedef std::function<void(const std::error_code& code)> err_func;
 
-  virtual void bind_reader_cb(rd_func, err_func) =0;
+	virtual void bind_cb(rd_func, err_func) =0;
 	virtual void write(const char* data, const size_t size) =0;
 	virtual void close() =0;
 };

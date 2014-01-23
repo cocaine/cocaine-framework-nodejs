@@ -26,128 +26,107 @@
 
 #include <cocaine/common.hpp>
 #include <uv.h>
-#include "nodejs/worker/app_loop.hpp"
-#include "nodejs/worker/uv_event.hpp"
 
 namespace worker { namespace io {
 
 template<class Socket>
 class readable_stream {
 	COCAINE_DECLARE_NONCOPYABLE(readable_stream)
-
 public:
+
 	typedef Socket socket_type;
+
 	typedef typename socket_type::endpoint_type endpoint_type;
-
-	readable_stream(app_loop& loop, endpoint_type endpoint)
-		: rr_socket(std::make_shared<socket_type>(endpoint))
-		, socket_watcher(new uv_poll_t)
-		, rd_offset(0)
-		, rx_offset(0) {
-		uv_poll_init(loop.get_loop(), socket_watcher, rr_socket->fd());
-		socket_watcher->data = this;
-		ring.resize(65536);
-  }
-
-  readable_stream(app_loop& loop, const std::shared_ptr<socket_type>& socket)
+	readable_stream(const std::shared_ptr<socket_type>& socket)
 		: rr_socket(socket)
-		, socket_watcher(new uv_poll_t)
 		, rd_offset(0)
 		, rx_offset(0) {
-		uv_poll_init(loop.get_loop(), socket_watcher, rr_socket->fd());
-		socket_watcher->data = this;
+		std::cout << "make readable_stream" << std::endl;
 		ring.resize(65536);
 	}
 
 	~readable_stream() {
-		delete socket_watcher;
+		//pass
 	}
 
 	template<class ReadHandler, class ErrorHandler>
 	void bind(ReadHandler read_handler, ErrorHandler error_handler) {
-		uv_poll_start(socket_watcher, UV_READABLE, UvEvent<readable_stream>::on_uv_event);
 		handle_read = read_handler;
 		handle_error = error_handler;
 	}
-
 	void unbind() {
-		uv_poll_stop(socket_watcher);
 		handle_read = nullptr;
 		handle_error = nullptr;
 	}
 
-	void on_event(uv_poll_t* req, int status, int event) {
-    if(status == -1){
-      uv_err_t err = uv_last_error(uv_default_loop());
-      handle_error(std::error_code(err.sys_errno_, std::system_category()));
-      uv_poll_stop(socket_watcher);
-      return;
-    } else {
-      while (ring.size() - rd_offset < 1024) {
-        size_t unparsed = rd_offset - rx_offset;
+	bool on_event(int status) {
+		if(status != 0){
+			uv_err_t err = uv_last_error(uv_default_loop());
+			handle_error(std::error_code(err.sys_errno_, std::system_category()));
+			return false;
+		}
 
-        if (unparsed + 1024 > ring.size()) {
-          ring.resize(ring.size() << 1);
-          continue;
-        }
+		while (ring.size() - rd_offset < 1024) {
+			size_t unparsed = rd_offset - rx_offset;
 
-        // There's no space left at the end of the buffer, so copy all the unparsed
-        // data to the beginning and continue filling it from there.
-        std::memmove(
-          ring.data(),
-          ring.data() + rx_offset,
-          unparsed
-          );
+			if (unparsed + 1024 > ring.size()) {
+				ring.resize(ring.size() << 1);
+				continue;
+			}
 
-        rd_offset = unparsed;
-        rx_offset = 0;
-      }
-    }
+			// There's no space left at the end of the buffer, so copy all the unparsed
+			// data to the beginning and continue filling it from there.
+			std::memmove(
+				ring.data(),
+				ring.data() + rx_offset,
+				unparsed
+			);
+
+			rd_offset = unparsed;
+			rx_offset = 0;
+		}
+
 
 		// Keep the error code if the read() operation fails.
 		std::error_code ec;
 
 		// Try to read some data.
 		ssize_t length = rr_socket->read(
-						 ring.data() + rd_offset,
-						 ring.size() - rd_offset,
-						 ec
-						);
+			ring.data() + rd_offset,
+			ring.size() - rd_offset,
+			ec
+			);
 
 		if (ec) {
 			handle_error(ec);
-			return;
+			return false;
 		}
-
 
 
 		if (length <= 0) {
 			if (length == 0) {
 				// NOTE: This means that the remote peer has closed the connection.
-        handle_error(std::error_code(ESHUTDOWN, std::system_category()));
-				uv_poll_stop(socket_watcher);
+				handle_error(std::error_code(ESHUTDOWN, std::system_category()));
+				return false;
 			}
 
-			return;
+			return false;
 		}
 
 		rd_offset += length;
 
 		size_t parsed = handle_read(
-					ring.data() + rx_offset,
-					rd_offset - rx_offset
-				);
+			ring.data() + rx_offset,
+			rd_offset - rx_offset
+		);
 
 		rx_offset += parsed;
+		return true;
 	}
 
 private:
-	// NOTE: Sockets can be shared among multiple queues, at least to be able
-	// to write and read from two different queues.
-	const std::shared_ptr<socket_type> rr_socket;
 
-	// Socket poll object.
-	uv_poll_t* socket_watcher;
+	const std::shared_ptr<socket_type> rr_socket;
 
 	std::vector<char> ring;
 

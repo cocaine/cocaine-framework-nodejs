@@ -14,7 +14,7 @@
         'include_dirs': [
             './include'
         ],
-        'cflags_cc!': ['-fno-rtti'],
+        'cflags_cc!': ['-fno-rtti', '-fno-exceptions'],
         'conditions': [
             ['OS=="mac"', {
                 'xcode_settings': {

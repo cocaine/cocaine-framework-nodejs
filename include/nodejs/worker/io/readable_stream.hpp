@@ -41,7 +41,6 @@ public:
 		: rr_socket(socket)
 		, rd_offset(0)
 		, rx_offset(0) {
-		std::cout << "make readable_stream" << std::endl;
 		ring.resize(65536);
 	}
 

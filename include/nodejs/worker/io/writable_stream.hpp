@@ -44,7 +44,6 @@ public:
 		, tx_offset(0)
 		, wr_offset(0) {
 
-		std::cout << "make writable_stream" << std::endl;
 		ring.resize(65536);
 	}
 

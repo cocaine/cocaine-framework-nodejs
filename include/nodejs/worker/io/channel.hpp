@@ -54,7 +54,6 @@ public:
 			throw std::runtime_error(cocaine::format("bind with active_events %d", active_events));
 		}
 		active_events = UV_READABLE;
-		std::cout << "start poll on fd " << socket->fd() << ", events " << active_events << std::endl;
 		uv_poll_start(watcher.get(), active_events, channel<Socket>::uv_on_event); 
 		rd->bind(func, err);
 		wr->bind(err);
@@ -70,13 +69,10 @@ public:
 	}
 
 	void write(const char* data, const size_t size) {
-		std::cout << "channel: write data, len " << size << std::endl;
 		bool continue_writing = wr->write(data, size);
 		if(continue_writing && !(active_events & UV_WRITABLE)){
 			active_events |= UV_WRITABLE;
 
-			std::cout << "start write poll on fd " << socket->fd() << ", events " << active_events << std::endl;
-			
 			uv_poll_start(watcher.get(), active_events, channel<Socket>::uv_on_event);
 		}
 	}
@@ -85,13 +81,7 @@ public:
 	void uv_on_event(uv_poll_t *req, int status, int event){
 		channel<Socket> *self = static_cast<channel<Socket>*>(req->data);
 
-		std::cout << "stamp: " << self->stamp << std::endl;
-		std::cout << "uv_on_event, status:" << status << " event: " << event
-							<< " fd: " << self->socket->fd() << " active_events: "<< self->active_events << std::endl;
-		std::cout << "error? " << (status!=0) << std::endl;
-		
 		if(status != 0){
-			std::cout << "in error branch" << std::endl;
 			uv_err_t err = uv_last_error(uv_default_loop());
 			std::error_code ec(err.sys_errno_, std::system_category());
 			
@@ -106,20 +96,16 @@ public:
 		}
 		
 		if(self->active_events & event & UV_READABLE){
-			std::cout << "handling readable" << std::endl;
 			bool reading = self->rd_stream->on_event(status);
 			if(!reading){
 				self->active_events &= ~UV_READABLE;
-				std::cout << "stop reading" << std::endl;
 				uv_poll_start(req, self->active_events, channel<Socket>::uv_on_event);
 			}
 		} 
 
 		if(self->active_events & event & UV_WRITABLE){
-			std::cout << "handling writable" << std::endl;
 			bool writing = self->wr->on_event(status);
 			if(!writing){
-				std::cout << "stop writing" << std::endl;
 				self->active_events &= ~UV_WRITABLE;
 				uv_poll_start(req, self->active_events, channel::uv_on_event);
 			}

@@ -1,30 +1,34 @@
 
+var hostname = require('os').hostname()
+var format = require('util').format
+var cli = new (require('../lib/client/client').Client)(['localhost', 10053])
 
-var cli = new (require('../lib/client/client').Client)()
 
-
-cli.getServices(['node', 'storage'], function(err, node, storage){
+cli.getServices(['logging', 'node', 'storage'], function(err, log, node, storage){
   if(err){
-    console.log('error resolving some of services', err)
-    return 
+    throw new Error(format('error resolving some of services, %j', err))
   }
+
+  log.setAppName(format('client/%s.%s',hostname,process.pid))
+
+  log.debug('connected to services')
 
   node.list(function(err, result){
     if(err){
-      console.log('error listing running apps', err)
+      log.debug('error listing running apps', err)
       return 
     }
     
-    console.log('running apps', result)
+    log.debug('running apps', result)
   })
 
   storage.find('manifests', ['app'], function(err, result){
     if(err){
-      console.log('error listing uploaded apps', err)
+      log.debug('error listing uploaded apps', err)
       return 
     }
 
-    console.log('uploaded apps', result)
+    log.debug('uploaded apps', result)
   })
   
 })

@@ -1,10 +1,9 @@
 {
   "name": "cocaine",
-  "version": "0.3.1-22",
+  "version": "0.4.0-alpha0",
   "description": "Node.js framework for Cocaine platform",
-
   "author": "Cocaine Project <cocaine@yandex-team.ru>",
-  "contributors":[
+  "contributors": [
     "Oleg Kutkov <olegkutkov@yandex-team.ru>",
     "Dmitry Unkovsky <diunko@yandex-team.ru>"
   ],
@@ -14,13 +13,12 @@
     "node": "0.8.0 - 0.10.99"
   },
   "dependencies": {
-    "msgpack": "~0.1.7",
     "bindings": "~1.0.0",
+    "hexy": "^0.2.6",
+    "jampack": "0.0.7",
+    "msgpack": "~0.1.7",
     "optimist": "~0.4",
-    "q":"~0.9",
-    "jampack":"0.0.7"
+    "q": "~0.9"
   },
-  "devDependencies": {
-  }
+  "devDependencies": {}
 }
-

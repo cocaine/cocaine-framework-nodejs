@@ -1,13 +1,13 @@
 
 var mp = require('msgpack')
 
-var cli = new (require('../lib/client/client').Client)(['localhost', 10053])
+var cli = new (require('../lib/client/client').Client)(['10.11.12.13', 10053])
 
 
 var baseTimeout = 500
 var timeout = baseTimeout
 
-var maxTries = 2
+var maxTries = 8
 var tries = 0
 
 cli.on('connect', function(){
@@ -54,43 +54,55 @@ cli.on('error', function(err){
 })
 
 
-var S = cli.Service('storage')
+var app = cli.Service('diunko_did_test-app', 'app')
 
-S.once('connect', function(){
-  console.log("so what's in store?")
-  
-  S.find('manifests', ['app'], function(err, appNames){
+var appTimeout = baseTimeout
+var appTries = 0
+
+app.on('connect', function(){
+
+  appTimeout = baseTimeout
+  appTries = 0
+
+  console.log("connected to app")
+
+  app.info(function(err, result){
     if(err){
-      console.log('storage error', err)
+      console.log('app.info error', JSON.stringify(err))
       return
     }
-    if(0 < appNames.length){
-      console.log("there's something for us:", appNames)
-      console.log('so what is %s?', appNames[0])
-      S.read('manifests', appNames[0], function(err, result){
-        if(err){
-          console.log(L.debug('storage error', err))
-          return
-        }
-        
-        console.log('and result is', mp.unpack(result))
-
-        S.close()
-        cli.close()
-      })
-    } else {
-      console.log("there's nothing")
-    }
+    console.log('app.info result', result)
   })
+  
 })
 
-S.connect()
-
-S.on('error', function(err){
-  console.log('storage error', err)
+app.on('error', function(err){
+  console.log('app client error', err)
+  if(appTries < maxTries
+     && (err.code === 'ESHUTDOWN'
+         || err.code === 'ECONNREFUSED'
+         || err.code === 'EPIPE')){
+    console.log('================================================================')
+    console.dir(app)
+    console.log('----------------------------------------------------------------')
+    if(app._state === 'error'){
+      console.log('closing error state')
+      app.close()
+    }
+    appTries++
+    setTimeout(function(){
+      console.log('connecting again')
+      app.connect()
+    },appTimeout)
+    
+    appTimeout <<= 1
+    
+  }
 })
 
 
-//setTimeout(function(){console.log('nomnom')}, 100*1000)
+app.connect()
+
+setTimeout(function(){console.log('nomnom')}, 100*1000)
 
 

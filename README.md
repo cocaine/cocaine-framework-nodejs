@@ -1,5 +1,6 @@
-
 # Cocaine NodeJS Framework
+
+[![Code Climate](https://codeclimate.com/github/cocaine/cocaine-framework-nodejs.png)](https://codeclimate.com/github/cocaine/cocaine-framework-nodejs)
 
 ## Examples of usage
 

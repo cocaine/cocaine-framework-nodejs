@@ -1,0 +1,36 @@
+
+{
+  "curly": true,
+  "eqeqeq": true,
+  "latedef": true,
+  "newcap": true,
+  "noarg": true,
+  "nonew": true,
+  "indent": 2,
+  "latedef": "nofunc",
+  
+  "maxlen": 120,
+
+  "asi": true,
+  "boss": true,
+  "laxcomma": true,
+  "proto": true,
+  "shadow": true,
+  "supernew": true,
+
+  "node": true,
+
+  // if(some
+  //    && some.thing
+  //    && some.thing())
+  // Bad line breaking before '&&'
+  "-W014": true,
+
+
+  // allow `something && do_something()`
+  // Expected an assignment or function call and instead saw an expression
+  "-W030": true
+
+
+}
+

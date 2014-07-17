@@ -1,4 +1,6 @@
 
+// jshint -W064
+
 var Fiber = require('fibers')
 
 var Client = require('../lib/client/client').Client

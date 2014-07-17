@@ -85,7 +85,7 @@ describe('channel', function(){
       var conn
 
       var N = 1024*1024
-      var b = Buffer(N)
+      var b = new Buffer(N)
       for(var i=0;i<N;i++){
         b[i] = i
       }
@@ -141,7 +141,7 @@ describe('channel', function(){
       var conn
 
       var N = 1024*1024
-      var b = Buffer(N)
+      var b = new Buffer(N)
       for(var i=0;i<N;i++){
         b[i] = i
       }
@@ -270,6 +270,8 @@ describe('channel', function(){
       var S = net.createServer()
 
       S.listen(sockpath, function(){
+        // jshint -W046
+        // it says: Don't use extra leading zeros '0000'
         fs.chmodSync(sockpath, 0000)
         var ch = new Channel(sockpath)
         ch.on_socket_error = function(errno0){
@@ -380,7 +382,7 @@ describe('channel', function(){
           ch = new Channel(sockpath)
           ch.close()
           ch._injectSocket(sock)
-          ch.send(Buffer(123))
+          ch.send(new Buffer(123))
           
           ch.on_socket_error = function(errno0){
             __assert(errno0 === errno.EPIPE || errno0 === errno.ECONNRESET,
@@ -414,7 +416,7 @@ describe('channel', function(){
 
       var S = net.createServer(function(conn0){
         conn = conn0
-        conn.write(Buffer([0xa2,1,2]))
+        conn.write(new Buffer([0xa2,1,2]))
       })
 
       S.listen(sockpath, function(){

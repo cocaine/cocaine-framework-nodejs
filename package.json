@@ -24,5 +24,8 @@
     "mocha":"1.20.x",
     "msgpack-buf": "0.1.8",
     "node-uuid":"1.4.x"
+  },
+  "scripts": {
+    "jshint":"find lib test sample -type f -name '*.js' | xargs node_modules/.bin/jshint --verbose"
   }
 }

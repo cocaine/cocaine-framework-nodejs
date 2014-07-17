@@ -86,6 +86,7 @@ Channel.prototype = {
       this.emit('end')
     },
     data: function(buf){
+      // jshint -W038
       __assert(Buffer.isBuffer(buf), 'Buffer.isBuffer(buf)')
       trace && console.log('channel got data', buf)
       

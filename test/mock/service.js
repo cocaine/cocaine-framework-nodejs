@@ -24,7 +24,7 @@ function _parseEndpoint(){
   } else {
     throw new Error('bad match: '+JSON.stringify(arguments))
   }
-},
+}
 
 
 function Service(endpoint, dispatch){

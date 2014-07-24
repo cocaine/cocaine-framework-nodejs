@@ -7,7 +7,7 @@ function smoke(){
     
     stateless: true, // this flag specifies that the service is 'stateless'
     // i.e. that all it's methods don't cause side-effects
-    // (which, strictly speaking, isn't true only for `info` method of `node` service)
+    // (strictly speaking, with `node` service this is true only for `info` method)
     // given this flag, it is assumed that all requests are safe to retry
     // as long as reconnect policy permits
 
@@ -20,7 +20,7 @@ function smoke(){
     maxConnectTries:10, // number of times to retry connect
     
     baseConnectTimeout:200, // initial reconnect interval.
-    // with each retry it is increased by two times
+    // with each retry it is increased by the factor of 2
 
     
     locator:{

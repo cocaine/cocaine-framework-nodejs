@@ -1,58 +1,70 @@
 
-var Resolving = require('../lib/client/resolving').Resolving
+var Service = require('../lib/client/resolving').Resolving
 
 function smoke(){
 
-  var Node = Resolving.def('node', {
-    stateless: true,
-    locator:{
-      endpoint: '10.11.12.13:10053'
+  var NodeService = Service.def('node', {
+    
+    stateless: true, // this flag specifies that the service is 'stateless'
+    // i.e. that all it's methods don't cause side-effects
+    // (which, strictly speaking, isn't true only for `info` method of `node` service)
+    // given this flag, it is assumed that all requests are safe to retry
+    // as long as reconnect policy permits
+
+    locator: {
+      endpoint: '10.11.12.13:10053' // specifies locator endpoint 
     }
   })
 
-  var node = new Node({
-    maxConnectTries:1,
-    //maxReconnects:0,
+  var node = new NodeService({
+    maxConnectTries:10, // number of times to retry connect
+    
+    baseConnectTimeout:200, // initial reconnect interval.
+    // with each retry it is increased by two times
+
+    
     locator:{
-      maxConnectTries:10,
-      //maxReconnects:0
+      // options for locator service client.
+      // with each connect of NodeService instance, a new locator
+      // instance is created. These options are passed to it's
+      // constructor
+
+      // options have same meaning as for NodeService
+      maxConnectTries: 4, 
+      baseConnectTimeout: 20
     }
   })
 
-  node.connect()
+  node.connect() // this is not mandatory, connect will be established
+  // automatically on first request
 
   node.on('connect', function(){
+
     setInterval(function(){
       node.list(function(err, result){
-        console.log('==== list result ====', arguments)
+        console.log('list() result', arguments)
       })
     },3000)
   })
 
-  // node.call('list', [], function(err, result){
-  //   console.log('==== list result ====', arguments)
-  // })
 
-  node.on('beforeError', function(err){
-
-    console.log('================ node beforeError', JSON.stringify(err))
-    if(err.condition === 'locator'){
-      if(err.code === 'ECONNREFUSED'){
-        // retry connect
-        this._setErrorHandler(['retry-all-requests'])
-        return true
-      }
-    } else if(err.code === 'ECONNREFUSED'){
-      this._setErrorHandler(['retry-connect'])
-      return true
-    }
+  // until we are yet not connected, we can 
+  // call `list` method of `node` service via a generic `call`
+  // interface.
+  // it's signature is `service.call(methodNamd, args, callback)`
+  node.call('list', [], function(err, result){
+    console.log('call(`list`) result:', arguments)
   })
 
-  // setInterval(function(){
-  //   node.call('list', [], function(err, result){
-  //     console.log('==== list result ====', arguments)
-  //   })
-  // },10000)
+
+  node.on('error', function(err){
+    console.log('node service error:', err)
+
+    // after `error` is emitted on NodeService instance, all pending
+    // sessions are going to err out
+
+  })
+
 
 }
 

@@ -176,18 +176,43 @@ and communicating to locator and target services.
 
 ```js
 var cli = new require('cocaine').Client()
-var app = cli.Service('the_app')
+var app = cli.Service('the_app', 'app')
 
 app.connect()
 
 app.on('connect', function(){
-    app.enqueue('handle','anydata', function(err, result){
-        if(err) {
-           console.log('app error', err)
-        } else {
-          console.log('app response is', result)
-        }
-    })
+  var s = app.enqueue(
+    'http', 
+    mp.pack(['GET',       // http method
+             '/',         // uri
+             'HTTP/1.0',  // http version
+             [['some-header','value']],  // tuple of header-value pairs
+             '']))  // body of request
+
+  var header
+  var body = []
+
+  s.on('data', function(chunk){
+    console.log('reply chunk', chunk)
+    var data = mp.unpack(chunk)
+    console.log('  which decodes', data)
+    if(header === undefined){
+      console.log('header')
+      header = data
+    } else {
+      console.log('body chunk')
+      body.push(data)
+    }
+  })
+
+  s.on('end', function(){
+    console.log('reply done')
+  })
+
+  s.on('error', function(err){
+    console.log('reply error', err)
+  })
+  
 })
 
 ```

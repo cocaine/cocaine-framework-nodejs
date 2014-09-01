@@ -1,7 +1,7 @@
 
 var mp = require('msgpack')
 
-var cli = new (require('../lib/client/client').Client)(['coca', 10053])
+var cli = new (require('../lib/client/client').Client)(['apefront.tst.ape.yandex.net', 10053])
 
 
 cli.resolve('node', function(err, result){

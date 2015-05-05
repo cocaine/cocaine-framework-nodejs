@@ -88,7 +88,7 @@ var cocaine = require("cocaine")
 
 var cli = new cocaine.Client(["localhost", 10053])
 
-var log = new cli.Logger("myprefix") // logs lines like "myprefix/..."
+var log = cli.Logger("myprefix") // logs lines like "myprefix/..."
 
 cli.on('error', function(err){
     console.log('client error', err)

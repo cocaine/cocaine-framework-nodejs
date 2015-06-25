@@ -1,8 +1,9 @@
 
 var argv = require('optimist').argv
 
-var _ = require('./lib/client/client')
-exports.Client = _.Client
+exports.Service = require('./lib/client/service').Service
+
+exports.Locator = require('./lib/client/locator').Locator
 
 exports.Worker = require('./lib/worker/worker').Worker
 
@@ -13,3 +14,13 @@ Object.defineProperty(exports,'http',{
 exports.spawnedBy = function(){
   return argv.uuid && argv.app && argv.locator && argv.endpoint
 }
+
+exports.getWorkerAttrs = function(){
+  return {
+    uuid: argv.uuid,
+    app: argv.app,
+    locator: argv.locator,
+    endpoint: argv.endpoint
+  }
+}
+

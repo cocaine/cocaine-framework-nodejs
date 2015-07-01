@@ -29,5 +29,10 @@
     "chai": "*",
     "@nojs/msgpack-socket": "*",
     "babel": "*"
+  },
+  "scripts": {
+    "__test": "node_modules/.bin/mocha --compilers js:babel/register",
+    "test": "mocha --compilers js:babel/register --reporter spec --timeout 60000",
+    "_test": "mocha --compilers js:babel/register --timeout 600000 --debug-brk"
   }
 }

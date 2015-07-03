@@ -24,3 +24,4 @@ exports.getWorkerAttrs = function(){
   }
 }
 
+exports.compat = require('./lib/compat')

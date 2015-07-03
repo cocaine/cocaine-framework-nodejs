@@ -8,8 +8,9 @@ var fmt = require('util').format
 
 var mp = require('@nojs/msgpack-socket')
 
-var Locator = require('..').Locator
-var Service = require('..').Service
+var cocaine = require('cocaine')
+var Locator = cocaine.Locator
+var Service = cocaine.Service
 
 var co = require('co')
 

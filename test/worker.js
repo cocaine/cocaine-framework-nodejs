@@ -3,7 +3,7 @@ var assert = require('assert')
 
 var mp = require('@nojs/msgpack-socket')
 
-var Worker = require('..').Worker
+var Worker = require('cocaine').Worker
 var co = require('co')
 
 var mkTempPath = require('@nojs/msgpack-socket/pair').mkTempPath

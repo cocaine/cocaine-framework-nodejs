@@ -2,7 +2,7 @@
 var debug = require('debug')('co:test:http')
 var assert = require('chai').assert
 
-var cocaine = require('..')
+var cocaine = require('cocaine')
 var http = cocaine.http
 
 var RPC = {

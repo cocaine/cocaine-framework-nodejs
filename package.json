@@ -1,6 +1,6 @@
 {
   "name": "cocaine",
-  "version": "0.12.1-r06",
+  "version": "0.12.1-node-0.12-01",
   "description": "Node.js framework for Cocaine platform",
   "author": "Cocaine Project <cocaine@yandex-team.ru>",
   "contributors": [

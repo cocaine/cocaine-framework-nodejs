@@ -25,8 +25,7 @@ function inspect(obj){
 
 var Q = require('q')
 
-var msgpackb = require('msgpack-buf')
-var msgpack = require('msgpack')
+var msgpack = require('msgpack-bin')
 
 function sleep(ms){
 

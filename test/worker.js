@@ -12,7 +12,7 @@ var protocol = require('../lib/protocol')
 
 var q = require('q')
 
-var msgpack = require('msgpack')
+var msgpack = require('msgpack-bin')
 
 var RPC = {
   invoke: 0,

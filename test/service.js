@@ -28,8 +28,7 @@ function inspect(obj){
 
 var Q = require('q')
 
-var msgpackb = require('msgpack-buf')
-var msgpack = require('msgpack')
+var msgpack = require('msgpack-bin')
 
 function sleep(ms){
 
@@ -96,7 +95,7 @@ describe('service client', function(){
 
       debug('connected to locator')
 
-      var m = yield lc.recvmsg(msgpack.unpack)
+      var m = yield lc.recvmsg(msgpack.unpackb)
       debug('locator got message', m)
 
       var [sid, method, [name]] = m
@@ -138,7 +137,7 @@ describe('service client', function(){
       var args = ['qqq', 12, 15, 'fff']
       var rx = S.subscribe.apply(S, args)
 
-      var m = yield sc.recvmsg(msgpack.unpack)
+      var m = yield sc.recvmsg(msgpack.unpackb)
 
       debug('service got message', m)
       var [sid, method, [...args]] = m
@@ -174,7 +173,7 @@ describe('service client', function(){
 
       debug('connected to locator')
 
-      var m = yield lc.recvmsg(msgpack.unpack)
+      var m = yield lc.recvmsg(msgpack.unpackb)
       debug('locator got message', m)
 
       var [sid, method, [name]] = m
@@ -216,7 +215,7 @@ describe('service client', function(){
       var args = ['qqq', 12, 15, 'fff']
       var rx = S.subscribe.apply(S, args)
 
-      var m = yield sc.recvmsg(msgpack.unpack)
+      var m = yield sc.recvmsg(msgpack.unpackb)
 
       debug('service got message', m)
       var [sid, method, [...args]] = m

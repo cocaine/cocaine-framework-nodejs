@@ -1,5 +1,5 @@
 
-var mp = require('msgpack')
+var mp = require('msgpack-bin')
 
 var assert = require('assert')
 var fmt = require('util').format

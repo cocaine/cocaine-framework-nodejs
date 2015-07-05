@@ -13,12 +13,9 @@
     "node": "0.8.0 - 0.10.99"
   },
   "dependencies": {
-    "@nojs/jampack": "0.0.8",
-    "bindings": "~1.0.0",
     "debug": "*",
     "hexy": "^0.2.6",
-    "msgpack": "0.1.*",
-    "msgpack-buf": "^0.1.8",
+    "msgpack-bin": "0.2.6-1",
     "optimist": "~0.4",
     "q": "1.*"
   },

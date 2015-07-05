@@ -1,17 +1,22 @@
 
+require("babel/register")({
+  // This will override `node_modules` ignoring - you can alternatively pass
+  // an array of strings to be explicitly matched or a regex / glob
+  ignore: false
+});
+
 var debug = require('debug')('test:locator')
 
-var assert0 = require('assert')
-var assert = require('chai').assert
+var assert = require('assert')
 
 var fmt = require('util').format
 
-var mp = require('@nojs/msgpack-socket')
+var mp = require('msgpack-socket')
 
 var Locator = require('cocaine').Locator
 var co = require('co')
 
-var pair = require('@nojs/msgpack-socket/pair')
+var pair = require('msgpack-socket/pair')
 var mkTempPath = pair.mkTempPath
 var mkSocketPair = pair.mkSocketPair
 

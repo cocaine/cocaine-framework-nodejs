@@ -1,16 +1,22 @@
 
+require("babel/register")({
+  // This will override `node_modules` ignoring - you can alternatively pass
+  // an array of strings to be explicitly matched or a regex / glob
+  ignore: false
+});
+
 var assert = require('assert')
 
-var mp = require('@nojs/msgpack-socket')
+var mp = require('msgpack-socket')
 
 var Worker = require('cocaine').Worker
 var co = require('co')
 
-var mkTempPath = require('@nojs/msgpack-socket/pair').mkTempPath
+var mkTempPath = require('msgpack-socket/pair').mkTempPath
 
 var protocol = require('../lib/protocol')
 
-var q = require('q')
+var Q = require('q')
 
 var msgpack = require('msgpack-bin')
 
@@ -25,7 +31,7 @@ var debug = require('debug')('co:test:worker')
 
 function sleep(ms){
 
-  var result = q.defer()
+  var result = Q.defer()
 
   var uid = (Math.random()*0x100000000).toString(36)
   
@@ -210,7 +216,6 @@ describe('worker', function(){
       var m = yield wc.recvmsg()
       console.log('response from worker', m)
 
-
       wc.sendmsg([15, RPC.choke, []])
 
       yield s.await('end')
@@ -248,6 +253,18 @@ describe('worker', function(){
 
       var s = yield W.await('handle1')
 
+      var end = Q.defer()
+      
+      s.once('end', function(){
+        console.log('session end')
+        end.fulfill(10)
+      })
+
+      s.on('readable', function(){
+        console.log('channel readable')
+        console.log('read data', s.read())
+      })
+
       yield [
         (function *sub1(){
 
@@ -257,7 +274,7 @@ describe('worker', function(){
           }
         })(),
 
-        (function *sub2(){
+        1 || (function *sub2(){
           var i=0
           while(i<10){
             yield s.await('readable')
@@ -274,12 +291,13 @@ describe('worker', function(){
 
       console.log('response from worker, heartbeat', m)
 
-      s.end()
-
+      console.log('closing session from service')
       wc.sendmsg([15, RPC.choke, []])
 
-      yield s.await('end')
+      yield end.promise //s.await('end')
       console.log('worker: end of input stream')
+
+      s.end()
 
       var m = yield wc.recvmsg()
       console.log('client: end of worker output stream', m)
@@ -299,7 +317,7 @@ describe('worker', function(){
   })
 
 
-  it('should stream both ways', function(done){
+  it.skip('should stream both ways', function(done){
 
     co(function *test(){
 
@@ -384,7 +402,7 @@ describe('worker', function(){
   })
 
 
-  it('should stream really huge chunks both ways', function(done){
+  it.skip('should stream really huge chunks both ways', function(done){
 
     co(function *test(){
 

@@ -1,6 +1,14 @@
 
+require("babel/register")({
+  // This will override `node_modules` ignoring - you can alternatively pass
+  // an array of strings to be explicitly matched or a regex / glob
+  ignore: false
+});
+
 var debug = require('debug')('co:test:http')
-var assert = require('chai').assert
+
+//var assert = require('chai').assert
+var assert = require('assert')
 
 var cocaine = require('cocaine')
 var http = cocaine.http
@@ -13,12 +21,12 @@ var RPC = {
 }
 
 
-var mp = require('@nojs/msgpack-socket')
+var mp = require('msgpack-socket')
 
 var Worker = require('..').Worker
 var co = require('co')
 
-var mkTempPath = require('@nojs/msgpack-socket/pair').mkTempPath
+var mkTempPath = require('msgpack-socket/pair').mkTempPath
 
 var protocol = require('../lib/protocol')
 
@@ -178,7 +186,7 @@ describe('http worker', function(){
   })
 
 
-  it.only('should be able to stream output data', function(done){
+  it('should be able to stream output data', function(done){
 
     co(function *test(){
 

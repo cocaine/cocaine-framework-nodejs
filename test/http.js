@@ -138,16 +138,16 @@ describe('http worker', function(){
 
       assert(uuid === options.uuid, "worker handshakes with it's uuid")
 
-      wc.sendmsg([15, RPC.invoke, ['http']])
+      wc.sendmsg([15, RPC.invoke, ['http'], [1,2,3, 'header']])
 
       var rq = ['GET','/','HTTP/1.0',
              [['some-header','value'],
               ['content-length', '7']],
              'andbody']
 
-      wc.sendmsg([15, RPC.chunk, [msgpack.pack(rq)]])
+      wc.sendmsg([15, RPC.chunk, [msgpack.pack(rq)], [1,2,3, 'header']])
 
-      wc.sendmsg([15, RPC.choke, []])
+      wc.sendmsg([15, RPC.choke, [], [1,2,3, 'header']])
 
       var m = yield wc.recvmsg()
 

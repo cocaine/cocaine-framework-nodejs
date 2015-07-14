@@ -1,6 +1,6 @@
 {
   "name": "cocaine",
-  "version": "0.12.1-node-0.12-04",
+  "version": "0.12.1-r07",
   "description": "Node.js framework for Cocaine platform",
   "author": "Cocaine Project <cocaine@yandex-team.ru>",
   "contributors": [
@@ -10,7 +10,7 @@
   "homepage": "https://github.com/cocaine/cocaine-framework-nodejs",
   "repository": "git://github.com/cocaine/cocaine-framework-nodejs.git",
   "engines": {
-    "node": "0.8.0 - 0.10.99"
+    "node": "0.8.0 - 2.*"
   },
   "dependencies": {
     "debug": "*",

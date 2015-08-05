@@ -288,6 +288,111 @@ describe('http worker', function(){
   })
 
 
+  it('should be able to stream output data in really large chunks', function(done){
+
+    co(function *test(){
+
+      debug('creating http server')
+
+      var server = new http.Server(function(req, res){
+        
+        debug('http server got request')
+        
+        var body = []
+
+        req.on('data', function(data){
+          debug('http server got data on request', data)
+          body.push(data)
+        })
+        
+        req.on('end', function(){
+          debug('end input stream, so writing response')
+          res.writeHead(200, {
+            'x-any-header': 'x-any-value',
+            'content-type': 'text/plain'
+          })
+          var b = new Buffer(10000000)
+          res.write(b)
+          setTimeout(function(){
+            res.write('hello, Cocaine!')
+            res.end('hello, Cocaine!')
+          }, 100)
+        })
+        
+      })
+
+      var handle = W.getListenHandle('http')
+
+      server.listen(handle)
+
+      var [_, wc] = yield [server.await('listening'), Node.await('connection')]
+
+      debug('http server listening, worker connected')
+
+      var m = yield wc.recvmsg(msgpack.unpack)
+
+      debug('node got message', m)
+
+      var [sid, method, [uuid]] = m
+
+      assert(uuid === options.uuid, "worker handshakes with it's uuid")
+
+      wc.sendmsg([15, RPC.invoke, ['http']])
+
+      var rq = ['GET','/','HTTP/1.1',
+             [['some-header','value'],
+              ['content-length', '7']],
+             'andbody']
+
+      wc.sendmsg([15, RPC.chunk, [msgpack.pack(rq)]])
+
+      wc.sendmsg([15, RPC.choke, []])
+
+      var m = yield wc.recvmsg()
+
+      debug('node got message from worker', m)
+      
+      yield sleep(3*1000)
+
+      var m = yield wc.recvmsg()
+      debug('node got message from worker', m)
+      
+      var [method, sid, [chunk]] = m
+
+      debug('http response header is', msgpack.unpack(chunk))
+      
+
+      var m = yield wc.recvmsg()
+      debug('node got message from worker', m)
+      var [method, sid, [chunk]] = m
+      debug('actual http response is `%s`', chunk)
+
+      var m = yield wc.recvmsg()
+      debug('node got message from worker', m)
+      var [method, sid, [chunk]] = m
+      debug('actual http response is `%s`', chunk)
+
+      var m = yield wc.recvmsg()
+      debug('node got message from worker', m)
+      var [method, sid, [chunk]] = m
+      debug('actual http response is `%s`', chunk)
+      
+      yield sleep(3*1000)
+
+      var m = yield wc.recvmsg()
+      debug('node got message from worker', m)
+
+      return done()
+
+    }).catch(function(err){
+      process.nextTick(function(){
+        throw err
+      })
+    })
+    
+  })
+
+  
   it.skip('should receive input stream', function(done){
 
     co(function *test(){

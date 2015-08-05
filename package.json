@@ -30,7 +30,7 @@
   "scripts": {
     "_postinstall": "rm -f node_modules/cocaine && ln -s .. node_modules/cocaine",
     "__test": "node_modules/.bin/mocha --compilers js:babel/register",
-    "test": "mocha --compilers js:babel/register --reporter spec --timeout 60000",
+    "test": "ln -s .. node_modules/cocaine; mocha --compilers js:babel/register --reporter spec --timeout 60000",
     "_test": "mocha --compilers js:babel/register --timeout 600000 --debug-brk"
   }
 }

@@ -101,7 +101,7 @@ describe('service client', function(){
 
       debug('connected to locator')
 
-      var m = yield lc.recvmsg(msgpack.unpackb)
+      var m = yield lc.recvmsg(msgpack.unpack)
       debug('locator got message', m)
 
       var [sid, method, [name]] = m
@@ -143,7 +143,7 @@ describe('service client', function(){
       var args = ['qqq', 12, 15, 'fff']
       var rx = S.subscribe.apply(S, args)
 
-      var m = yield sc.recvmsg(msgpack.unpackb)
+      var m = yield sc.recvmsg(msgpack.unpack)
 
       debug('service got message', m)
       var [sid, method, [...args]] = m
@@ -179,7 +179,7 @@ describe('service client', function(){
 
       debug('connected to locator')
 
-      var m = yield lc.recvmsg(msgpack.unpackb)
+      var m = yield lc.recvmsg(msgpack.unpack)
       debug('locator got message', m)
 
       var [sid, method, [name]] = m
@@ -221,7 +221,7 @@ describe('service client', function(){
       var args = ['qqq', 12, 15, 'fff']
       var rx = S.subscribe.apply(S, args)
 
-      var m = yield sc.recvmsg(msgpack.unpackb)
+      var m = yield sc.recvmsg(msgpack.unpack)
 
       debug('service got message', m)
       var [sid, method, [...args]] = m

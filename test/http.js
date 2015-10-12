@@ -117,9 +117,11 @@ describe('http worker', function(){
             'x-any-header': 'x-any-value',
             'content-type': 'text/plain'
           })
+          debug('writing response')
+
           res.end('hello, Cocaine!')
+
         })
-        
       })
 
       var handle = W.getListenHandle('http')
@@ -149,33 +151,38 @@ describe('http worker', function(){
 
       wc.sendmsg([15, RPC.choke, [], [1,2,3, 'header']])
 
-      var m = yield wc.recvmsg()
+      var header
 
-      debug('node got message from worker', m)
-      
-      yield sleep(3*1000)
+      while(true) {
+        var m = yield wc.recvmsg()
+        var [sid, method, args] = m
 
-      var m = yield wc.recvmsg()
-      debug('node got message from worker', m)
-      
-      var [method, sid, [chunk]] = m
+        if(sid !== 15){
+          debug(' -- other message from worker', m)
+          continue
+        }
+        debug('node got response from worker', m)
 
-      debug('http response header is', msgpack.unpack(chunk))
-      
 
-      var m = yield wc.recvmsg()
-      debug('node got message from worker', m)
-      
-      var [method, sid, [chunk]] = m
+        if(method === RPC.chunk){
 
-      debug('actual http response is `%s`', chunk)
-      
-      yield sleep(3*1000)
-
-      var m = yield wc.recvmsg()
-      debug('node got message from worker', m)
-
-      return done()
+          var chunk = args[0]
+          
+          if(!header){
+            header = msgpack.unpack(chunk)
+            debug('http response header chunk is', header)
+          } else {
+            debug('body chunk is', chunk)
+          }
+        } else {
+          if (method === RPC.choke){
+            debug('response closed')
+            return done()
+          } else {
+            debug('other message in response channel')
+          }
+        }
+      }
 
     }).catch(function(err){
       process.nextTick(function(){
@@ -209,9 +216,23 @@ describe('http worker', function(){
             'x-any-header': 'x-any-value',
             'content-type': 'text/plain'
           })
-          res.write('hello, Cocaine!')
-          res.write('hello, Cocaine!')
-          res.end('hello, Cocaine!')
+          debug('writing response')
+          
+          var i=0
+          _write_next()
+          function _write_next(){
+            res.write('hello, Cocaine! '+i, function(){
+              debug('done saying hello', i++)
+              if(i<3){
+                setTimeout(_write_next, 1000)
+              } else {
+                res.end()
+                0 && res.end(null, function(){
+                  debug('done closing response stream')
+                })
+              }
+            })
+          }
         })
         
       })
@@ -232,52 +253,49 @@ describe('http worker', function(){
 
       assert(uuid === options.uuid, "worker handshakes with it's uuid")
 
-      wc.sendmsg([15, RPC.invoke, ['http']])
+      wc.sendmsg([15, RPC.invoke, ['http'], [1,2,3, 'header']])
 
-      var rq = ['GET','/','HTTP/1.1',
+      var rq = ['GET','/','HTTP/1.0',
              [['some-header','value'],
               ['content-length', '7']],
              'andbody']
 
-      wc.sendmsg([15, RPC.chunk, [msgpack.pack(rq)]])
+      wc.sendmsg([15, RPC.chunk, [msgpack.pack(rq)], [1,2,3, 'header']])
 
-      wc.sendmsg([15, RPC.choke, []])
+      wc.sendmsg([15, RPC.choke, [], [1,2,3, 'header']])
 
-      var m = yield wc.recvmsg()
+      var header
 
-      debug('node got message from worker', m)
-      
-      yield sleep(3*1000)
+      while(true) {
+        var m = yield wc.recvmsg()
+        var [sid, method, args] = m
 
-      var m = yield wc.recvmsg()
-      debug('node got message from worker', m)
-      
-      var [method, sid, [chunk]] = m
+        if(sid !== 15){
+          debug(' -- other message from worker', m)
+          continue
+        }
+        debug('node got response from worker', m)
 
-      debug('http response header is', msgpack.unpack(chunk))
-      
 
-      var m = yield wc.recvmsg()
-      debug('node got message from worker', m)
-      var [method, sid, [chunk]] = m
-      debug('actual http response is `%s`', chunk)
+        if(method === RPC.chunk){
 
-      var m = yield wc.recvmsg()
-      debug('node got message from worker', m)
-      var [method, sid, [chunk]] = m
-      debug('actual http response is `%s`', chunk)
-
-      var m = yield wc.recvmsg()
-      debug('node got message from worker', m)
-      var [method, sid, [chunk]] = m
-      debug('actual http response is `%s`', chunk)
-      
-      yield sleep(3*1000)
-
-      var m = yield wc.recvmsg()
-      debug('node got message from worker', m)
-
-      return done()
+          var chunk = args[0]
+          
+          if(!header){
+            header = msgpack.unpack(chunk)
+            debug('http response header chunk is', header)
+          } else {
+            debug('body chunk is', chunk)
+          }
+        } else {
+          if (method === RPC.choke){
+            debug('response closed')
+            return done()
+          } else {
+            debug('other message in response channel')
+          }
+        }
+      }
 
     }).catch(function(err){
       process.nextTick(function(){
@@ -291,6 +309,9 @@ describe('http worker', function(){
   it('should be able to stream output data in really large chunks', function(done){
 
     co(function *test(){
+
+      var sentLength = 0
+      var recvLength = 0
 
       debug('creating http server')
 
@@ -311,14 +332,25 @@ describe('http worker', function(){
             'x-any-header': 'x-any-value',
             'content-type': 'text/plain'
           })
+          debug('writing response')
+
           var b = new Buffer(10000000)
-          res.write(b)
-          setTimeout(function(){
-            res.write('hello, Cocaine!')
-            res.end('hello, Cocaine!')
-          }, 100)
+          b.fill('a')
+          
+          var i=0
+          _write_next()
+          function _write_next(){
+            res.write(b, function(){
+              sentLength += b.length
+              debug('done saying hello', i++)
+              if(i<8){
+                setTimeout(_write_next, 1000)
+              } else {
+                res.end()
+              }
+            })
+          }
         })
-        
       })
 
       var handle = W.getListenHandle('http')
@@ -337,52 +369,53 @@ describe('http worker', function(){
 
       assert(uuid === options.uuid, "worker handshakes with it's uuid")
 
-      wc.sendmsg([15, RPC.invoke, ['http']])
+      wc.sendmsg([15, RPC.invoke, ['http'], [1,2,3, 'header']])
 
-      var rq = ['GET','/','HTTP/1.1',
+      var rq = ['GET','/','HTTP/1.0',
              [['some-header','value'],
               ['content-length', '7']],
              'andbody']
 
-      wc.sendmsg([15, RPC.chunk, [msgpack.pack(rq)]])
+      wc.sendmsg([15, RPC.chunk, [msgpack.pack(rq)], [1,2,3, 'header']])
 
-      wc.sendmsg([15, RPC.choke, []])
+      wc.sendmsg([15, RPC.choke, [], [1,2,3, 'header']])
 
-      var m = yield wc.recvmsg()
+      var header
 
-      debug('node got message from worker', m)
-      
-      yield sleep(3*1000)
+      while(true) {
+        var m = yield wc.recvmsg()
+        var [sid, method, args] = m
 
-      var m = yield wc.recvmsg()
-      debug('node got message from worker', m)
-      
-      var [method, sid, [chunk]] = m
+        if(sid !== 15){
+          debug(' -- other message from worker', m)
+          continue
+        }
+        debug('node got response from worker', m)
 
-      debug('http response header is', msgpack.unpack(chunk))
-      
 
-      var m = yield wc.recvmsg()
-      debug('node got message from worker', m)
-      var [method, sid, [chunk]] = m
-      debug('actual http response is `%s`', chunk)
+        if(method === RPC.chunk){
 
-      var m = yield wc.recvmsg()
-      debug('node got message from worker', m)
-      var [method, sid, [chunk]] = m
-      debug('actual http response is `%s`', chunk)
+          var chunk = args[0]
+          
+          if(!header){
+            header = msgpack.unpack(chunk)
+            debug('http response header chunk is', header)
+          } else {
+            debug('body chunk is', chunk)
+            recvLength += chunk.length
+          }
+        } else {
+          if (method === RPC.choke){
+            debug('response closed')
 
-      var m = yield wc.recvmsg()
-      debug('node got message from worker', m)
-      var [method, sid, [chunk]] = m
-      debug('actual http response is `%s`', chunk)
-      
-      yield sleep(3*1000)
-
-      var m = yield wc.recvmsg()
-      debug('node got message from worker', m)
-
-      return done()
+            assert.deepEqual(sentLength, recvLength)
+            
+            return done()
+          } else {
+            debug('other message in response channel')
+          }
+        }
+      }
 
     }).catch(function(err){
       process.nextTick(function(){
@@ -392,7 +425,7 @@ describe('http worker', function(){
     
   })
 
-  
+
   it.skip('should receive input stream', function(done){
 
     co(function *test(){
